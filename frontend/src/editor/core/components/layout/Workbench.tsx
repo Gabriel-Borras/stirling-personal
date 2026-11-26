@@ -294,7 +294,7 @@ export default function Workbench() {
       {/* Main content area */}
       <div
         className="flex-1 min-h-0 relative flex flex-col"
-        style={{ minWidth: 0 }}
+        style={{ minWidth: 0, minHeight: 0, overflow: "hidden" }}
       >
         <WorkbenchSidebarControls
           showLeftExpand={showLeftExpand}
@@ -305,11 +305,10 @@ export default function Workbench() {
           className={`flex-1 min-h-0 z-10 ${currentView === "pageEditor" ? "relative flex flex-col" : `relative ${styles.workbenchScrollable}`}`}
           style={{
             transition: "opacity 0.15s ease-in-out",
-            // Force min-width:0 so flex children (notably the files page
-            // toolbar with its 5 bulk-action buttons + 2 selects + view
-            // toggle) can shrink below their intrinsic content size on
-            // narrow viewports instead of overflowing horizontally.
+            // Force min-width/min-height:0 so flex children can shrink below
+            // their intrinsic content size instead of overflowing the viewport.
             minWidth: 0,
+            minHeight: 0,
             ...(currentView === "pageEditor" && { height: 0 }),
           }}
         >
