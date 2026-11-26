@@ -28,6 +28,7 @@ import LandingPage from "@editor/components/shared/LandingPage";
 import DismissAllErrorsButton from "@editor/components/shared/DismissAllErrorsButton";
 import { NotificationBell } from "@editor/components/notifications/NotificationBell";
 import { FeedbackTag } from "@editor/components/feedback/FeedbackTag";
+import { WorkbenchSidebarControls } from "@editor/components/shared/WorkbenchSidebarControls";
 
 // Workbench panels are loaded on demand. Viewer pulls in pdfjs-dist and the
 // full @embedpdf plugin set; FileEditor/PageTracks are only needed once a file
@@ -121,6 +122,13 @@ export default function Workbench() {
     !readerMode &&
     !takeover &&
     !strip.enabled;
+  const isWorkspaceHub = currentView === "myFiles" || currentView === "signing";
+  const hideToolPanel =
+    isWorkspaceHub || (activeCustomView?.hideToolPanel ?? false);
+  const showLeftExpand =
+    !isMobile && !readerMode && !takeover && currentView !== "signing";
+  const showRightExpand =
+    !isMobile && !readerMode && !takeover && !hideToolPanel;
 
   // On the transition, so reading sets the toolbar's start state without locking it.
   const prevReaderModeRef = useRef(readerMode);
@@ -284,28 +292,38 @@ export default function Workbench() {
       <DismissAllErrorsButton />
 
       {/* Main content area */}
-      <Box
-        className={`flex-1 min-h-0 z-10 ${currentView === "pageEditor" ? "relative flex flex-col" : `relative ${styles.workbenchScrollable}`}`}
-        style={{
-          transition: "opacity 0.15s ease-in-out",
-          // Force min-width:0 so flex children (notably the files page
-          // toolbar with its 5 bulk-action buttons + 2 selects + view
-          // toggle) can shrink below their intrinsic content size on
-          // narrow viewports instead of overflowing horizontally.
-          minWidth: 0,
-          ...(currentView === "pageEditor" && { height: 0 }),
-        }}
+      <div
+        className="flex-1 min-h-0 relative flex flex-col"
+        style={{ minWidth: 0 }}
       >
-        <Suspense
-          fallback={
-            <Center style={{ height: "100%" }}>
-              <Loader />
-            </Center>
-          }
+        <WorkbenchSidebarControls
+          showLeftExpand={showLeftExpand}
+          showRightExpand={showRightExpand}
+          selectedTool={selectedTool ?? null}
+        />
+        <Box
+          className={`flex-1 min-h-0 z-10 ${currentView === "pageEditor" ? "relative flex flex-col" : `relative ${styles.workbenchScrollable}`}`}
+          style={{
+            transition: "opacity 0.15s ease-in-out",
+            // Force min-width:0 so flex children (notably the files page
+            // toolbar with its 5 bulk-action buttons + 2 selects + view
+            // toggle) can shrink below their intrinsic content size on
+            // narrow viewports instead of overflowing horizontally.
+            minWidth: 0,
+            ...(currentView === "pageEditor" && { height: 0 }),
+          }}
         >
-          {renderMainContent()}
-        </Suspense>
-      </Box>
+          <Suspense
+            fallback={
+              <Center style={{ height: "100%" }}>
+                <Loader />
+              </Center>
+            }
+          >
+            {renderMainContent()}
+          </Suspense>
+        </Box>
+      </div>
       <FeedbackTag />
     </Box>
   );

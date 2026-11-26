@@ -9,6 +9,7 @@ import { ToolPanelFooterTarget } from "@editor/components/tools/ToolPanelFooter"
 import ToolSearch from "@editor/components/tools/toolPicker/ToolSearch";
 import { ToolPanelViewerBar } from "@editor/components/tools/ToolPanelViewerBar";
 import { openSuperSearch } from "@editor/components/shared/superSearch/openSuperSearch";
+import { SidebarToggleIcon } from "@editor/components/shared/SidebarToggleIcon";
 import { ActionIcon } from "@editor/ui/ActionIcon";
 import { Icon } from "@editor/ui/Icon";
 import { ToolId } from "@editor/types/toolId";
@@ -20,6 +21,8 @@ interface ToolPanelProps {
   onShowAllTools: () => void;
   /** Tool-selection handler; falls back to the workflow context's handler. */
   onToolSelect?: (id: ToolId) => void;
+  /** Collapse handler for the right tool sidebar (desktop only). */
+  onCollapse?: () => void;
   /**
    * Which view to render, overriding the workflow context. RightSidebar renders
    * both while the tool view slides over the picker or off it.
@@ -40,6 +43,7 @@ export default function ToolPanel({
   allToolsView,
   onShowAllTools,
   onToolSelect,
+  onCollapse,
   compact: compactProp,
   showSearch = false,
   view,
@@ -104,17 +108,35 @@ export default function ToolPanel({
                   <span className="tool-panel__list-title">
                     {t("toolPanel.toolsHeader", "PDF Tools")}
                   </span>
-                  <ActionIcon
-                    variant="quiet"
-                    accent="neutral"
-                    size="sm"
-                    onClick={() => openSuperSearch(["tools"])}
-                    title={t("toolPanel.searchTools", "Search tools")}
-                    aria-label={t("toolPanel.searchTools", "Search tools")}
-                    data-testid="tool-panel-search"
-                  >
-                    <Icon name="search" size="1rem" />
-                  </ActionIcon>
+                  <div className="tool-panel__list-actions">
+                    <ActionIcon
+                      variant="quiet"
+                      accent="neutral"
+                      size="sm"
+                      onClick={() => openSuperSearch(["tools"])}
+                      title={t("toolPanel.searchTools", "Search tools")}
+                      aria-label={t("toolPanel.searchTools", "Search tools")}
+                      data-testid="tool-panel-search"
+                    >
+                      <Icon name="search" size="1rem" />
+                    </ActionIcon>
+                    {onCollapse && (
+                      <ActionIcon
+                        variant="quiet"
+                        accent="neutral"
+                        size="sm"
+                        onClick={onCollapse}
+                        title={t("toolPanel.collapse", "Collapse tool panel")}
+                        aria-label={t(
+                          "toolPanel.collapse",
+                          "Collapse tool panel",
+                        )}
+                        data-testid="right-sidebar-collapse"
+                      >
+                        <SidebarToggleIcon size={16} mirrored />
+                      </ActionIcon>
+                    )}
+                  </div>
                 </div>
               )
             }

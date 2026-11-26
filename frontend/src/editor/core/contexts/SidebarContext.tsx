@@ -1,4 +1,12 @@
-import { createContext, useContext, useState, useRef, useMemo } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   SidebarState,
   SidebarRefs,
@@ -6,12 +14,30 @@ import {
   SidebarProviderProps,
 } from "@editor/types/sidebar";
 
+const LEFT_SIDEBAR_COLLAPSED_KEY = "stirling.leftSidebarCollapsed";
+const RIGHT_SIDEBAR_COLLAPSED_KEY = "stirling.rightSidebarCollapsed";
+
+function readCollapsedState(key: string): boolean {
+  try {
+    return window.localStorage.getItem(key) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function writeCollapsedState(key: string, collapsed: boolean): void {
+  try {
+    window.localStorage.setItem(key, String(collapsed));
+  } catch {
+    // private mode / quota: ignore
+  }
+}
+
 const SidebarContext = createContext<SidebarContextValue | undefined>(
   undefined,
 );
 
 export function SidebarProvider({ children }: SidebarProviderProps) {
-  // All sidebar state management
   const quickAccessRef = useRef<HTMLDivElement>(null);
   const toolPanelRef = useRef<HTMLDivElement>(null);
 
@@ -19,13 +45,37 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
     "toolPicker" | "toolContent"
   >("toolPicker");
   const [readerMode, setReaderMode] = useState(false);
+  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(() =>
+    readCollapsedState(LEFT_SIDEBAR_COLLAPSED_KEY),
+  );
+  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(() =>
+    readCollapsedState(RIGHT_SIDEBAR_COLLAPSED_KEY),
+  );
+
+  useEffect(() => {
+    writeCollapsedState(LEFT_SIDEBAR_COLLAPSED_KEY, leftSidebarCollapsed);
+  }, [leftSidebarCollapsed]);
+
+  useEffect(() => {
+    writeCollapsedState(RIGHT_SIDEBAR_COLLAPSED_KEY, rightSidebarCollapsed);
+  }, [rightSidebarCollapsed]);
+
+  const toggleLeftSidebar = useCallback(() => {
+    setLeftSidebarCollapsed((prev) => !prev);
+  }, []);
+
+  const toggleRightSidebar = useCallback(() => {
+    setRightSidebarCollapsed((prev) => !prev);
+  }, []);
 
   const sidebarState: SidebarState = useMemo(
     () => ({
       leftPanelView,
       readerMode,
+      leftSidebarCollapsed,
+      rightSidebarCollapsed,
     }),
-    [leftPanelView, readerMode],
+    [leftPanelView, readerMode, leftSidebarCollapsed, rightSidebarCollapsed],
   );
 
   const sidebarRefs: SidebarRefs = useMemo(
@@ -42,8 +92,19 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
       sidebarRefs,
       setLeftPanelView,
       setReaderMode,
+      setLeftSidebarCollapsed,
+      setRightSidebarCollapsed,
+      toggleLeftSidebar,
+      toggleRightSidebar,
     }),
-    [sidebarState, sidebarRefs, setLeftPanelView, setReaderMode],
+    [
+      sidebarState,
+      sidebarRefs,
+      setLeftPanelView,
+      setReaderMode,
+      toggleLeftSidebar,
+      toggleRightSidebar,
+    ],
   );
 
   return (

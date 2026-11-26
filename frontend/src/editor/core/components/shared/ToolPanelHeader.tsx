@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ActionIcon } from "@editor/ui/ActionIcon";
 import { Icon } from "@editor/ui/Icon";
+import { SidebarToggleIcon } from "@editor/components/shared/SidebarToggleIcon";
 import "@editor/components/shared/ToolPanelHeader.css";
 
 export interface ToolPanelHeaderProps {
@@ -12,11 +13,15 @@ export interface ToolPanelHeaderProps {
   onClose?: () => void;
   /** aria-label for the close button. */
   closeLabel?: string;
+  /** Collapse handler for the right tool sidebar. */
+  onCollapse?: () => void;
+  /** aria-label for the collapse button. */
+  collapseLabel?: string;
 }
 
 /**
  * Header for the active-tool rail surface: a tinted icon badge + title in a
- * rounded bar with a trailing close button.
+ * rounded bar with optional trailing collapse and close buttons.
  *
  * Core-owned so the OSS build carries no design-system dependency. It mirrors
  * the shared rail header's styling for the simple (non-menu) case the tool panel
@@ -28,6 +33,8 @@ export function ToolPanelHeader({
   title,
   onClose,
   closeLabel,
+  onCollapse,
+  collapseLabel,
 }: ToolPanelHeaderProps) {
   return (
     <div className="sui-panelhdr">
@@ -35,6 +42,21 @@ export function ToolPanelHeader({
         <span className="sui-panelhdr__icon">{icon}</span>
         <span className="sui-panelhdr__label">{title}</span>
       </div>
+      {onCollapse && (
+        <ActionIcon
+          className="sui-panelhdr__close"
+          variant="tertiary"
+          accent="neutral"
+          shape="circle"
+          size="md"
+          onClick={onCollapse}
+          aria-label={collapseLabel ?? ""}
+          title={collapseLabel}
+          data-testid="right-sidebar-collapse"
+        >
+          <SidebarToggleIcon size={18} mirrored />
+        </ActionIcon>
+      )}
       {onClose && (
         <ActionIcon
           className="sui-panelhdr__close"

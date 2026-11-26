@@ -1,6 +1,8 @@
 export interface SidebarState {
   leftPanelView: "toolPicker" | "toolContent";
   readerMode: boolean;
+  leftSidebarCollapsed: boolean;
+  rightSidebarCollapsed: boolean;
 }
 
 export interface SidebarRefs {
@@ -22,6 +24,10 @@ export interface SidebarContextValue {
     React.SetStateAction<"toolPicker" | "toolContent">
   >;
   setReaderMode: React.Dispatch<React.SetStateAction<boolean>>;
+  setLeftSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
+  setRightSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
+  toggleLeftSidebar: () => void;
+  toggleRightSidebar: () => void;
 }
 
 export interface SidebarProviderProps {

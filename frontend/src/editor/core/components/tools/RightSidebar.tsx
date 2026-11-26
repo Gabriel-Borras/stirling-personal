@@ -11,6 +11,7 @@ import { usePoliciesEnabled } from "@editor/components/policies/usePoliciesEnabl
 import { EditorPipelinesPanel } from "@editor/components/policies/EditorPipelinesPanel";
 import { ToolIcon } from "@editor/components/shared/ToolIcon";
 import { ToolPanelHeader } from "@editor/components/shared/ToolPanelHeader";
+import { SidebarToggleIcon } from "@editor/components/shared/SidebarToggleIcon";
 import { ActionIcon } from "@editor/ui/ActionIcon";
 import { Icon } from "@editor/ui/Icon";
 import { ToolId } from "@editor/types/toolId";
@@ -30,7 +31,7 @@ import "@editor/components/tools/ToolPanel.css";
  */
 export default function RightSidebar() {
   const { t } = useTranslation();
-  const { sidebarRefs } = useSidebarContext();
+  const { sidebarRefs, sidebarState, toggleRightSidebar } = useSidebarContext();
   const { toolPanelRef, quickAccessRef } = sidebarRefs;
   const isMobile = useIsMobile();
   const policiesEnabled = usePoliciesEnabled();
@@ -106,15 +107,23 @@ export default function RightSidebar() {
   };
 
   const expandedWidth = useToolPanelWidth();
+  const isCollapsed =
+    !isMobile &&
+    !fullscreenExpanded &&
+    Boolean(sidebarState?.rightSidebarCollapsed);
+  const handleCollapseRight = !isMobile ? toggleRightSidebar : undefined;
 
   return (
     <div
       ref={toolPanelRef}
       data-sidebar="tool-panel"
+      data-collapsed={isCollapsed || undefined}
       data-tour={fullscreenExpanded ? undefined : "tool-panel"}
-      className={`tool-panel flex flex-col ${fullscreenExpanded ? "tool-panel--fullscreen-active" : "overflow-hidden"} ${isMobile || fullscreenExpanded ? "border-l border-[var(--c-border-subtle)]" : "tool-panel--floating"} transition-all duration-300 ease-out ${isMobile ? "h-full border-r-0" : fullscreenExpanded ? "h-screen" : ""} ${fullscreenExpanded ? "tool-panel--fullscreen" : ""}`}
+      aria-hidden={isCollapsed || undefined}
+      inert={isCollapsed || undefined}
+      className={`tool-panel flex flex-col ${isCollapsed ? "tool-panel--collapsed" : ""} ${fullscreenExpanded ? "tool-panel--fullscreen-active" : "overflow-hidden"} ${isMobile || fullscreenExpanded ? "border-l border-[var(--c-border-subtle)]" : "tool-panel--floating"} transition-all duration-300 ease-out ${isMobile ? "h-full border-r-0" : fullscreenExpanded ? "h-screen" : ""} ${fullscreenExpanded ? "tool-panel--fullscreen" : ""}`}
       style={{
-        width: isMobile ? "100%" : expandedWidth,
+        width: isMobile ? "100%" : isCollapsed ? 0 : expandedWidth,
         padding: "0",
       }}
     >
@@ -149,6 +158,26 @@ export default function RightSidebar() {
                         {t("toolPanel.pdfTools", "PDF Tools")}
                       </span>
                       <div className="tool-panel__compact-header-actions">
+                        {handleCollapseRight && (
+                          <ActionIcon
+                            variant="tertiary"
+                            size="md"
+                            shape="circle"
+                            onClick={handleCollapseRight}
+                            aria-label={t(
+                              "toolPanel.collapse",
+                              "Collapse tool panel",
+                            )}
+                            title={t(
+                              "toolPanel.collapse",
+                              "Collapse tool panel",
+                            )}
+                            className="tool-panel__expand-btn"
+                            data-testid="right-sidebar-collapse"
+                          >
+                            <SidebarToggleIcon size={18} mirrored />
+                          </ActionIcon>
+                        )}
                         <ActionIcon
                           variant="tertiary"
                           size="md"
@@ -167,6 +196,7 @@ export default function RightSidebar() {
                     allToolsView={allToolsView}
                     onShowAllTools={handleShowAllTools}
                     onToolSelect={handlePickerSelect}
+                    onCollapse={handleCollapseRight}
                     compact={false}
                     /* Mobile keeps the workbench bar - and with it the super search -
                      on the other slide, so the list needs its own filter. */
@@ -194,6 +224,11 @@ export default function RightSidebar() {
                           />
                         }
                         title={activeTool.name}
+                        onCollapse={handleCollapseRight}
+                        collapseLabel={t(
+                          "toolPanel.collapse",
+                          "Collapse tool panel",
+                        )}
                         onClose={handleClose}
                         closeLabel={t(
                           "toolPanel.backToAllTools",

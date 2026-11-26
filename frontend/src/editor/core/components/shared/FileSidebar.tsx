@@ -77,6 +77,7 @@ import type { FolderId, FolderRecord } from "@editor/types/folder";
 import { useToolEligibleFileIds } from "@editor/contexts/ToolFileEligibilityContext";
 import { useWorkbenchFileDrop } from "@editor/components/layout/useWorkbenchFileDrop";
 import { useDamagedFileRepair } from "@editor/contexts/DamagedFileRepairContext";
+import { useOptionalSidebarContext } from "@editor/contexts/SidebarContext";
 import "@editor/components/shared/FileSidebar.css";
 import {
   CONNECTED_ACCOUNTS_SETTINGS_PATH,
@@ -1281,21 +1282,36 @@ const FileSidebar = forwardRef<HTMLDivElement, FileSidebarProps>(
       ...(extraActions ?? []),
     ];
 
+    const sidebarContext = useOptionalSidebarContext();
+    const isCollapsed =
+      sidebarContext?.sidebarState?.leftSidebarCollapsed ?? false;
+    const toggleLeftSidebar = sidebarContext?.toggleLeftSidebar;
+
     return (
       <div
         ref={ref}
-        className="file-sidebar"
-        style={{
-          width: SIDEBAR_WIDTH,
-          minWidth: SIDEBAR_WIDTH,
-          maxWidth: SIDEBAR_WIDTH,
-        }}
+        className={`file-sidebar${isCollapsed ? " file-sidebar--collapsed" : ""}`}
+        style={
+          isCollapsed
+            ? undefined
+            : {
+                width: SIDEBAR_WIDTH,
+                minWidth: SIDEBAR_WIDTH,
+                maxWidth: SIDEBAR_WIDTH,
+              }
+        }
         data-sidebar="file-sidebar"
+        data-collapsed={isCollapsed || undefined}
         data-tour="quick-access-bar"
+        aria-hidden={isCollapsed || undefined}
+        inert={isCollapsed || undefined}
         {...dropHandlers}
       >
         <div className="file-sidebar-inner">
-          <SidebarHeader />
+          <SidebarHeader
+            collapsed={isCollapsed}
+            onToggleCollapse={toggleLeftSidebar}
+          />
 
           <input
             ref={nativeFileInputRef}
