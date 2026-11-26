@@ -1041,7 +1041,10 @@ export function emitTextLine(opts: CreatedTextOptions): number[] {
         }
       }
       // With no advance to compare, the width says nothing; the font's own mapping still tells a wrong code from a right one.
-      if ([...text.trim()].length === 1 && !readsBackAs(ptr, text)) {
+      if (
+        [...text.trim()].length === 1 &&
+        !readsBackAs(ptr, text, strategyUsed === "content-stream")
+      ) {
         removeAndDestroyObject(m, opts.page.pagePtr, ptr);
         return emitWithSetText(text, x) || emitBase14(text, x);
       }
@@ -1060,10 +1063,17 @@ export function emitTextLine(opts: CreatedTextOptions): number[] {
     return codes !== null && setCharcodesOn(m, ptr, codes);
   }
 
-  // A guessed code that reads back as another character drew that character. A font that reads back nothing has no mapping to judge by.
-  function readsBackAs(ptr: number, text: string): boolean {
+  // A guessed code that reads back as another character drew that character.
+  // Content-stream guesses come from a page whose text layer already mapped this
+  // font, so an empty readback means the guessed CID is unmapped (.notdef).
+  function readsBackAs(
+    ptr: number,
+    text: string,
+    requireNonEmpty = false,
+  ): boolean {
     const got = readBackTextObj(m, opts.page.pagePtr, ptr);
-    if (got === null || got.trim() === "") return true;
+    if (got === null) return !requireNonEmpty;
+    if (got.trim() === "") return !requireNonEmpty;
     return got.trim() === text.trim();
   }
 

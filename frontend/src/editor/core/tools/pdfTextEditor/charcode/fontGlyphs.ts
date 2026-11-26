@@ -21,6 +21,7 @@ type Glyph = "outline" | "box" | "none";
 // Characters a subset rarely holds. Two of them drawn with one outline are both the font's missing-glyph box: no font draws two of these alike.
 const RARE_CHARACTERS =
   "^`|~{}\u00a4\u00ac\u00b1\u00f7\u00de\u00f0\u00fe\u0192";
+const OUTLINE_PROBE_CHARACTERS = "etaoinshrdluAEIOU0123456789";
 const PROBE_FONT_SIZE = 12;
 const SINGLE_BYTE_CODES = 255;
 const SCRATCH_GRID = 16;
@@ -28,12 +29,14 @@ const SCRATCH_STEP_PT = 30;
 
 const outlines = new Map<number, Map<string, string | null>>();
 const missingOutlines = new Map<number, string | null>();
+const readableFonts = new Map<number, boolean>();
 const codeTexts = new Map<number, Map<string, number>>();
 
 /** Font pointers are reused across documents, so every document starts empty. */
 export function resetFontGlyphs(): void {
   outlines.clear();
   missingOutlines.clear();
+  readableFonts.clear();
   codeTexts.clear();
 }
 
@@ -107,6 +110,20 @@ function glyphOf(m: WrappedPdfiumModule, font: number, ch: string): Glyph {
   return outline === missingOutlineOf(m, font) ? "box" : "outline";
 }
 
+function fontHasOutlines(m: WrappedPdfiumModule, font: number): boolean {
+  const known = readableFonts.get(font);
+  if (known !== undefined) return known;
+  let found = false;
+  for (const ch of OUTLINE_PROBE_CHARACTERS) {
+    if (glyphOf(m, font, ch) === "outline") {
+      found = true;
+      break;
+    }
+  }
+  readableFonts.set(font, found);
+  return found;
+}
+
 /**
  * The letters of `text` that `font` has no glyph of their own for: each is drawn as
  * the font's missing-glyph box, or has no outline where another letter of `text` has
@@ -122,7 +139,7 @@ export function lettersWithoutGlyph(
   // Control and private-use codes reach a glyph by the font's own code, never by Unicode.
   const letters = [...new Set(text.replace(/[\s\p{C}]+/gu, ""))];
   const glyphs = letters.map((ch) => glyphOf(m, font, ch));
-  const readable = glyphs.includes("outline");
+  const readable = glyphs.includes("outline") || fontHasOutlines(m, font);
   return letters.filter(
     (_, i) => glyphs[i] === "box" || (readable && glyphs[i] === "none"),
   );
