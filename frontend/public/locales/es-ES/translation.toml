@@ -7240,7 +7240,9 @@ title = "No se han podido guardar los cambios"
 close = "Cerrar archivo"
 collapse = "Contraer"
 expand = "Expandir"
+focus = "Ver solo este archivo"
 rename = "Renombrar archivo"
+showAll = "Ver todos los archivos"
 
 [pageTracks.wrap]
 label = "Ajustar páginas"

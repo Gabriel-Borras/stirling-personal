@@ -142,6 +142,12 @@ export interface TrackRowProps {
   onShiftPage: (pageId: string, by: -1 | 1) => void;
   /** Asks to close the file; the parent confirms before anything closes. */
   onClose: (fileId: FileId) => void;
+  /** True when multiple tracks exist and this one can be isolated in single-file grid view. */
+  canFocus?: boolean;
+  /** True when this track is currently isolated in single-file grid view. */
+  focused?: boolean;
+  onFocusTrack?: (fileId: FileId) => void;
+  onExitFocus?: () => void;
 }
 
 function TrackRowImpl({
@@ -172,6 +178,10 @@ function TrackRowImpl({
   onDuplicate,
   onShiftPage,
   onClose,
+  canFocus = false,
+  focused = false,
+  onFocusTrack,
+  onExitFocus,
 }: TrackRowProps) {
   const { t } = useTranslation();
   const { setNodeRef, isOver } = useDroppable({
@@ -204,6 +214,9 @@ function TrackRowImpl({
   // survives track reorder via the row's fileId key; a save remounts the row,
   // which reasonably reopens it.
   const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    if (focused) setCollapsed(false);
+  }, [focused]);
   // Which page (by id) the view modal is showing, or null when closed. Kept by
   // id, not index, so an edit that reorders pages doesn't jump the preview.
   const [viewPageId, setViewPageId] = useState<string | null>(null);
@@ -409,24 +422,37 @@ function TrackRowImpl({
       <header
         ref={setHandleRef}
         className={styles.trackHeader}
-        {...handleListeners}
+        {...(focused ? {} : handleListeners)}
       >
-        <Tooltip position="bottom" content={collapseLabel}>
-          <ActionIcon
-            className={styles.trackCollapse}
-            variant="quiet"
-            size="sm"
-            aria-label={collapseLabel}
-            aria-expanded={!collapsed}
-            onClick={() => setCollapsed((value) => !value)}
+        {focused && onExitFocus ? (
+          <button
+            type="button"
+            className={styles.trackBackButton}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={onExitFocus}
+            data-testid="page-tracks-show-all"
           >
-            {collapsed ? (
-              <Icon name="chevron-right" size="1.25rem" />
-            ) : (
-              <Icon name="chevron-down" size="1.25rem" />
-            )}
-          </ActionIcon>
-        </Tooltip>
+            <Icon name="arrow-left" size="0.9375rem" />
+            <span>{t("pageTracks.track.showAll", "Show all files")}</span>
+          </button>
+        ) : (
+          <Tooltip position="bottom" content={collapseLabel}>
+            <ActionIcon
+              className={styles.trackCollapse}
+              variant="quiet"
+              size="sm"
+              aria-label={collapseLabel}
+              aria-expanded={!collapsed}
+              onClick={() => setCollapsed((value) => !value)}
+            >
+              {collapsed ? (
+                <Icon name="chevron-right" size="1.25rem" />
+              ) : (
+                <Icon name="chevron-down" size="1.25rem" />
+              )}
+            </ActionIcon>
+          </Tooltip>
+        )}
         <TrackNameField
           name={name}
           onRename={(nextName) => onRename(track, nextName)}
@@ -461,6 +487,23 @@ function TrackRowImpl({
             <Icon name="eye" size="1rem" />
           </ActionIcon>
         </Tooltip>
+        {canFocus && onFocusTrack && (
+          <Tooltip
+            position="bottom"
+            content={t("pageTracks.track.focus", "Focus on this file")}
+          >
+            <ActionIcon
+              className={styles.trackLeadAction}
+              variant="quiet"
+              size="sm"
+              aria-label={t("pageTracks.track.focus", "Focus on this file")}
+              data-testid="page-tracks-focus-file"
+              onClick={() => onFocusTrack(track.fileId)}
+            >
+              <Icon name="maximize-2" size="0.9375rem" />
+            </ActionIcon>
+          </Tooltip>
+        )}
 
         <div className={styles.trackActions}>
           <Tooltip position="bottom" content={selectAllLabel}>

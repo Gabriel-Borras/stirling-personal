@@ -188,8 +188,12 @@ export default function PageTracks() {
   // The file the user asked to view, held across a save: committing gives it a
   // new id, and the viewer drops an active file that has left the workbench.
   const viewTargetRef = useRef<FileId | null>(null);
+  // Single-file focus mode: isolates one track in wrapped grid view while
+  // keeping all other files loaded in the workspace.
+  const [focusedFileId, setFocusedFileId] = useState<FileId | null>(null);
   const handleVersioned = useCallback(
     (previousId: FileId, nextId: FileId) => {
+      setFocusedFileId((prev) => (prev === previousId ? nextId : prev));
       if (viewTargetRef.current !== previousId) return;
       viewTargetRef.current = nextId;
       setActiveFileId(nextId);
@@ -266,6 +270,21 @@ export default function PageTracks() {
       }).length === 1,
   );
   const toggleWrap = useCallback(() => setWrap((prev) => !prev), []);
+  const wrapBeforeFocusRef = useRef<boolean>(false);
+  const focusTrack = useCallback(
+    (fileId: FileId) => {
+      if (focusedFileId === null) {
+        wrapBeforeFocusRef.current = wrap;
+      }
+      setFocusedFileId(fileId);
+      setWrap(true);
+    },
+    [focusedFileId, wrap],
+  );
+  const exitFocus = useCallback(() => {
+    setFocusedFileId(null);
+    setWrap(wrapBeforeFocusRef.current);
+  }, []);
 
   // Scales the page tiles only: the tracks, headers and bar keep their size.
   const [zoom, setZoom] = useState(1);
@@ -449,10 +468,30 @@ export default function PageTracks() {
   );
 
   const clearSelection = selection.clear;
-  const toggleSelectAll =
-    totalPages > 0 && selection.selectedCount === totalPages
-      ? selection.clear
-      : selection.selectAll;
+  const focusedTrackPages =
+    focusedFileId != null
+      ? (workspace.tracks[focusedFileId]?.pages ?? [])
+      : null;
+  const effectiveTotalPages = focusedTrackPages
+    ? focusedTrackPages.length
+    : totalPages;
+  const toggleSelectAll = useCallback(() => {
+    if (focusedFileId != null) {
+      const ids = (workspace.tracks[focusedFileId]?.pages ?? []).map(
+        (p) => p.id,
+      );
+      const allFocusedSelected =
+        ids.length > 0 && ids.every((id) => selection.selectedIds.has(id));
+      if (allFocusedSelected) selection.clear();
+      else selection.setSelection(ids);
+      return;
+    }
+    if (totalPages > 0 && selection.selectedCount === totalPages) {
+      selection.clear();
+    } else {
+      selection.selectAll();
+    }
+  }, [focusedFileId, workspace.tracks, selection, totalPages]);
 
   /**
    * Moves one track before `beforeFileId` (or to the end when null). The
@@ -564,6 +603,21 @@ export default function PageTracks() {
       if (!placed.has(id) && workspace.tracks[id]) place("split", id);
     return rows;
   }, [fileState.files.ids, workspace, pendingFileIds, unsupportedFileIds]);
+
+  useEffect(() => {
+    if (focusedFileId === null) return;
+    if (!workspace.tracks[focusedFileId] || displayRows.length <= 1) {
+      setFocusedFileId(null);
+    }
+  }, [focusedFileId, workspace.tracks, displayRows.length]);
+
+  const visibleRows = useMemo(
+    () =>
+      focusedFileId === null
+        ? displayRows
+        : displayRows.filter((row) => row.id === focusedFileId),
+    [displayRows, focusedFileId],
+  );
 
   const lastReorderableId = useMemo(() => {
     for (let i = displayRows.length - 1; i >= 0; i--)
@@ -1038,7 +1092,7 @@ export default function PageTracks() {
   );
 
   usePageTracksWorkbenchBarButtons({
-    totalPages,
+    totalPages: effectiveTotalPages,
     selectedCount: selection.selectedCount,
     canUndo,
     canRedo,
@@ -1097,6 +1151,10 @@ export default function PageTracks() {
         onDuplicate={duplicatePages}
         onShiftPage={shiftPage}
         onClose={setCloseRequest}
+        canFocus={displayRows.length > 1 && focusedFileId === null}
+        focused={focusedFileId === fileId}
+        onFocusTrack={focusTrack}
+        onExitFocus={exitFocus}
       />
     );
   };
@@ -1169,7 +1227,7 @@ export default function PageTracks() {
               if (event.target === event.currentTarget) clearSelection();
             }}
           >
-            {displayRows.map((row) => {
+            {visibleRows.map((row) => {
               const dropBefore =
                 draggingTrack != null && trackDropTarget === row.id;
               const dropAfterLast =

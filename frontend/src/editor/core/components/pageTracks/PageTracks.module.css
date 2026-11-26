@@ -70,6 +70,36 @@
   flex: 0 0 auto;
 }
 
+.trackBackButton {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1_5);
+  height: 1.75rem;
+  padding: 0 var(--space-2_5);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.trackBackButton:hover {
+  background: var(--c-hover);
+  border-color: var(--c-border-strong);
+}
+
+.trackBackButton:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+}
+
 /* Sits after the page count, so a long filename must not squeeze it. */
 .trackLeadAction {
   flex: 0 0 auto;
