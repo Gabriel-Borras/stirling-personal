@@ -5375,6 +5375,52 @@ desc = "Add custom text anywhere in your PDF"
 tags = "text,annotation,label,add text,insert text,place text,text box,add label,add caption,type on PDF,write on PDF,add words,add note,text overlay,typewriter"
 title = "Add Text"
 
+[home.quickText]
+desc = "Click anywhere on a PDF page to type text inline with quick formatting"
+tags = "quick text,typewriter,adobe,inline text,fill and sign,type on PDF,write on PDF,text box,bold,italic,underline,color"
+title = "Quick Text"
+
+[quickText]
+dragToMove = "Drag to move"
+placeholder = "Type text here"
+savedTitle = "Text applied to PDF"
+saveErrorTitle = "Could not save text to PDF"
+
+[quickText.actions]
+apply = "Apply to PDF"
+clearAll = "Clear"
+redo = "Redo"
+saveAndDownload = "Save & Download"
+saving = "Saving..."
+undo = "Undo"
+
+[quickText.colors]
+black = "Black"
+blue = "Blue"
+gray = "Gray"
+green = "Green"
+red = "Red"
+
+[quickText.panel]
+instructions = "Click anywhere on the PDF page to place an inline text box and type directly. Use the floating toolbar above the box to adjust size, bold, italic, underline, color, or delete."
+pagePrefix = "P{{page}}:"
+placedBoxes = "Placed text boxes ({{count}})"
+title = "Quick Text"
+
+[quickText.toolbar]
+bold = "Bold (Ctrl+B)"
+color = "Text color"
+decreaseSize = "Decrease font size"
+delete = "Delete text box"
+increaseSize = "Increase font size"
+italic = "Italic (Ctrl+I)"
+label = "Text formatting"
+underline = "Underline (Ctrl+U)"
+
+[quickText.topBar]
+count = "{{count}} text box(es)"
+hint = "Click anywhere on the page to type directly"
+
 [home.adjustContrast]
 desc = "Adjust Colours/Contrast, Saturation and Brightness of a PDF"
 tags = "contrast,brightness,saturation,adjust colours,colour correction,enhance,lighten,darken,improve quality,colour balance,hue,vibrance"

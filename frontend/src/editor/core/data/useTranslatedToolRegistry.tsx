@@ -208,6 +208,23 @@ export function useTranslatedToolCatalog(): TranslatedToolCatalog {
         synonyms: getSynonyms(t, "addText"),
         supportsAutomate: false,
       },
+      quickText: {
+        icon: <Icon name="case-sensitive" size="1.5rem" />,
+        name: t("home.quickText.title", "Quick Text"),
+        component: lazy(() => import("@editor/tools/QuickText")),
+        description: t(
+          "home.quickText.desc",
+          "Click anywhere on a PDF page to type text inline with quick formatting",
+        ),
+        categoryId: ToolCategoryId.STANDARD_TOOLS,
+        subcategoryId: SubcategoryId.GENERAL,
+        workbench: "viewer",
+        endpoints: ["view-pdf"],
+        operationConfig: asRegistryConfig(signOperationConfig),
+        automationSettings: null,
+        synonyms: getSynonyms(t, "quickText"),
+        supportsAutomate: false,
+      },
       addImage: {
         icon: <Icon name="image" size="1.5rem" />,
         name: t("home.addImage.title", "Add Image"),

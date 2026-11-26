@@ -5898,6 +5898,52 @@ desc = "Añada texto personalizado en cualquier parte del PDF"
 tags = "texto,anotación,etiqueta,añadir texto,insertar texto,colocar texto,cuadro de texto,añadir etiqueta,añadir pie de foto,escribir en PDF,escribir sobre PDF,añadir palabras,añadir nota,capa de texto,máquina de escribir"
 title = "Añadir texto"
 
+[home.quickText]
+desc = "Haz clic en cualquier parte de una página PDF para escribir texto directamente con formato rápido"
+tags = "texto rápido,máquina de escribir,adobe,texto en línea,rellenar y firmar,escribir en PDF,cuadro de texto,negrita,cursiva,subrayado,color"
+title = "Texto rápido"
+
+[quickText]
+dragToMove = "Arrastra para mover"
+placeholder = "Introduce el texto aquí"
+savedTitle = "Texto aplicado al PDF"
+saveErrorTitle = "No se pudo guardar el texto en el PDF"
+
+[quickText.actions]
+apply = "Aplicar al PDF"
+clearAll = "Limpiar"
+redo = "Rehacer"
+saveAndDownload = "Guardar y descargar"
+saving = "Guardando..."
+undo = "Deshacer"
+
+[quickText.colors]
+black = "Negro"
+blue = "Azul"
+gray = "Gris"
+green = "Verde"
+red = "Rojo"
+
+[quickText.panel]
+instructions = "Haz clic en cualquier parte de la página PDF para colocar un cuadro de texto y escribir directamente. Usa la barra flotante encima del cuadro para cambiar el tamaño, negrita, cursiva, subrayado, color o eliminar."
+pagePrefix = "P{{page}}:"
+placedBoxes = "Cuadros de texto ({{count}})"
+title = "Texto rápido"
+
+[quickText.toolbar]
+bold = "Negrita (Ctrl+B)"
+color = "Color de texto"
+decreaseSize = "Reducir tamaño de fuente"
+delete = "Eliminar cuadro de texto"
+increaseSize = "Aumentar tamaño de fuente"
+italic = "Cursiva (Ctrl+I)"
+label = "Formato de texto"
+underline = "Subrayado (Ctrl+U)"
+
+[quickText.topBar]
+count = "{{count}} cuadro(s) de texto"
+hint = "Haz clic en cualquier parte de la página para escribir directamente"
+
 [home.adjustContrast]
 desc = "Ajusta colores/contraste, saturación y brillo de un PDF"
 tags = "contraste,brillo,saturación,ajustar colores,corrección de color,mejorar,aclarar,oscurecer,mejorar calidad,balance de color,tono,intensidad"

@@ -29,6 +29,7 @@ export const TOOL_CREDIT_COSTS: Partial<Record<ToolId, number>> = {
   rotate: CREDIT_COSTS.SMALL,
   removePages: CREDIT_COSTS.SMALL,
   addText: CREDIT_COSTS.SMALL,
+  quickText: CREDIT_COSTS.SMALL,
   addPassword: CREDIT_COSTS.SMALL,
   removePassword: CREDIT_COSTS.SMALL,
   changePermissions: CREDIT_COSTS.SMALL,

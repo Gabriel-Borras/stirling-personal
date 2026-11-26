@@ -1,0 +1,241 @@
+.quick-text-page-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: auto;
+  cursor: text;
+  user-select: none;
+}
+
+.quick-text-box {
+  position: absolute;
+  display: inline-flex;
+  align-items: flex-start;
+  min-width: 140px;
+  border: 1.5px solid transparent;
+  border-radius: 2px;
+  padding: 2px 4px;
+  background: transparent;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.quick-text-box:hover:not(.quick-text-box--active) {
+  border-color: color-mix(in srgb, var(--c-primary) 55%, transparent);
+  background: color-mix(in srgb, var(--c-document-bg) 65%, transparent);
+  cursor: move;
+}
+
+.quick-text-box--active {
+  border-color: var(--c-primary);
+  background: color-mix(in srgb, var(--c-document-bg) 92%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-primary) 25%, transparent);
+  z-index: 30;
+}
+
+.quick-text-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  min-height: 20px;
+  margin-left: -2px;
+  margin-right: 2px;
+  padding-top: 2px;
+  color: var(--c-primary);
+  cursor: grab;
+  flex-shrink: 0;
+  opacity: 0.75;
+  transition: opacity 120ms ease;
+}
+
+.quick-text-drag-handle:hover {
+  opacity: 1;
+}
+
+.quick-text-drag-handle:active {
+  cursor: grabbing;
+}
+
+.quick-text-editor-wrap {
+  position: relative;
+  display: inline-grid;
+  align-items: start;
+  min-width: 132px;
+}
+
+/* Hidden mirror keeps the textarea sized exactly to its content without scrollbars. */
+.quick-text-mirror,
+.quick-text-textarea {
+  grid-area: 1 / 1;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-family: Helvetica, Arial, sans-serif;
+  line-height: 1.25;
+  white-space: pre;
+  overflow: hidden;
+  resize: none;
+  box-sizing: border-box;
+}
+
+.quick-text-mirror {
+  visibility: hidden;
+  pointer-events: none;
+  min-height: 1.25em;
+}
+
+.quick-text-textarea {
+  width: 100%;
+  height: 100%;
+  caret-color: var(--c-primary);
+}
+
+.quick-text-textarea::placeholder {
+  color: var(--c-text-subtle);
+  opacity: 0.75;
+}
+
+.quick-text-floating-toolbar {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: var(--c-floating-menu-bg);
+  color: var(--c-floating-menu-text);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  z-index: 40;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.quick-text-floating-toolbar--below {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+
+.quick-text-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--c-floating-menu-text);
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.quick-text-toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.quick-text-toolbar-btn--active {
+  background: var(--c-primary);
+  color: var(--c-text-on-primary);
+}
+
+.quick-text-toolbar-btn--active:hover {
+  background: var(--c-primary-hover);
+}
+
+.quick-text-toolbar-btn--danger:hover {
+  color: var(--c-floating-danger-hover);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.quick-text-toolbar-glyph-sm {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.quick-text-toolbar-glyph-lg {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.quick-text-toolbar-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 3px;
+  background: rgba(255, 255, 255, 0.18);
+  flex-shrink: 0;
+}
+
+.quick-text-color-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 4px;
+}
+
+.quick-text-color-swatch {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.quick-text-color-swatch:hover {
+  transform: scale(1.15);
+  border-color: white;
+}
+
+.quick-text-color-swatch--active {
+  border-color: white;
+  box-shadow: 0 0 0 1.5px var(--c-primary);
+  transform: scale(1.1);
+}
+
+.quick-text-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  background: var(--c-bg-raised);
+  border-bottom: 1px solid var(--c-border-subtle);
+  flex-wrap: wrap;
+}
+
+.quick-text-top-bar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quick-text-top-bar-hint {
+  font-size: 0.8125rem;
+  color: var(--c-text-muted);
+}
+
+.quick-text-top-bar-count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: var(--c-primary-subtle);
+  color: var(--c-accent-fg, var(--c-primary));
+}

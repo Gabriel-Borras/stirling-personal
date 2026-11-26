@@ -20,6 +20,11 @@
       "title": "Add Text to PDF - Stirling PDF",
       "description": "Add custom text anywhere in your PDF"
     },
+    "quickText": {
+      "image": "/og_images/home.png",
+      "title": "Quick Text - Stirling PDF",
+      "description": "Click anywhere on a PDF page to type text inline with quick formatting"
+    },
     "addPassword": {
       "image": "/og_images/add-password.png",
       "title": "Password Protect PDF - Stirling PDF",
@@ -785,6 +790,7 @@
     "/cert-sign": "certSign",
     "/sign": "sign",
     "/add-text": "addText",
+    "/quick-text": "quickText",
     "/add-password": "addPassword",
     "/remove-password": "removePassword",
     "/remove-pages": "removePages",

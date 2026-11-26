@@ -104,6 +104,7 @@ export const URL_TO_TOOL_MAP: Record<string, ToolId> = {
   "/automate": "automate",
   "/sign": "sign",
   "/add-text": "addText",
+  "/quick-text": "quickText",
   "/pdf-text-editor": "pdfTextEditor",
 
   // Developer tools
