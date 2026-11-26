@@ -30,7 +30,7 @@ engine = [
 engine-dev = [
     "anyio>=4.14.2",
     "datamodel-code-generator[ruff]==0.64.0",
-    "pyrefly==1.4.1",
+    "pyrefly==1.5.0",
     "pytest>=9.1.1",
     "referencing>=0.37.0",
     "ruff==0.15.5",
