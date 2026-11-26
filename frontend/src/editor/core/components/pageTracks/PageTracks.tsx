@@ -467,7 +467,11 @@ export default function PageTracks() {
     [dispatch, selection.selectedIds],
   );
 
-  const clearSelection = selection.clear;
+  const {
+    clear: clearSelection,
+    selectAll: selectAllPages,
+    selectedCount,
+  } = selection;
   const focusedTrackPages =
     focusedFileId != null
       ? (workspace.tracks[focusedFileId]?.pages ?? [])
@@ -481,17 +485,26 @@ export default function PageTracks() {
         (p) => p.id,
       );
       const allFocusedSelected =
-        ids.length > 0 && ids.every((id) => selection.selectedIds.has(id));
-      if (allFocusedSelected) selection.clear();
-      else selection.setSelection(ids);
+        ids.length > 0 && ids.every((id) => selectedIds.has(id));
+      if (allFocusedSelected) clearSelection();
+      else setSelection(ids);
       return;
     }
-    if (totalPages > 0 && selection.selectedCount === totalPages) {
-      selection.clear();
+    if (totalPages > 0 && selectedCount === totalPages) {
+      clearSelection();
     } else {
-      selection.selectAll();
+      selectAllPages();
     }
-  }, [focusedFileId, workspace.tracks, selection, totalPages]);
+  }, [
+    focusedFileId,
+    workspace.tracks,
+    selectedIds,
+    selectedCount,
+    clearSelection,
+    selectAllPages,
+    setSelection,
+    totalPages,
+  ]);
 
   /**
    * Moves one track before `beforeFileId` (or to the end when null). The
