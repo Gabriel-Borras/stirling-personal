@@ -1060,16 +1060,25 @@ export class EditTextCommand implements Command {
     const span = measureObjSpanPt(m, allEmittedPtrs);
     if (span) {
       const left = Math.min(run.bounds.x, span.left);
-      const right = Math.max(run.bounds.x + run.bounds.width, span.right);
+      const shrinkWidth =
+        this.nextText.length < this.prevText.length &&
+        this.nextText.trimEnd() === this.nextText;
+      const right = shrinkWidth
+        ? Math.max(left + run.fontSize, span.right)
+        : Math.max(run.bounds.x + run.bounds.width, span.right);
       run.bounds = { ...run.bounds, x: left, width: Math.max(0, right - left) };
     }
     const addedLines = outputLines.length - this.prevText.split(/\r?\n/).length;
-    if (addedLines > 0 && !rotationFromMatrix(run.matrix)) {
-      const drop = addedLines * lineHeight;
+    if (addedLines !== 0 && !rotationFromMatrix(run.matrix)) {
+      const top = run.bounds.y + run.bounds.height;
+      const nextHeight = Math.max(
+        run.fontSize * 1.2,
+        run.bounds.height + addedLines * lineHeight,
+      );
       run.bounds = {
         ...run.bounds,
-        y: run.bounds.y - drop,
-        height: run.bounds.height + drop,
+        y: top - nextHeight,
+        height: nextHeight,
       };
     }
     run.text = this.nextText;

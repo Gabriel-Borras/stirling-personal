@@ -53,6 +53,8 @@ export interface QuickTextBox {
 export interface PageDimensionsPt {
   width: number;
   height: number;
+  /** Page /Rotate angle in degrees (0, 90, 180, 270). */
+  rotation?: number;
 }
 
 export interface QuickTextDefaults {

@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import { generateId } from "@editor/utils/generateId";
 import {
   DEFAULT_FONT_SIZE_PT,
@@ -25,6 +26,7 @@ export interface QuickTextSnapshot {
 type Listener = () => void;
 
 const MAX_HISTORY = 50;
+const TEXT_UNDO_COALESCE_MS = 600;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -32,6 +34,32 @@ function clamp(value: number, min: number, max: number): number {
 
 function cloneBoxes(boxes: readonly QuickTextBox[]): QuickTextBox[] {
   return boxes.map((box) => ({ ...box }));
+}
+
+function boxesEqual(
+  a: readonly QuickTextBox[],
+  b: readonly QuickTextBox[],
+): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    const x = a[i];
+    const y = b[i];
+    if (
+      x.id !== y.id ||
+      x.pageIndex !== y.pageIndex ||
+      x.xRatio !== y.xRatio ||
+      x.yRatio !== y.yRatio ||
+      x.text !== y.text ||
+      x.fontSizePt !== y.fontSizePt ||
+      x.bold !== y.bold ||
+      x.italic !== y.italic ||
+      x.underline !== y.underline ||
+      x.color !== y.color
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /**
@@ -52,6 +80,8 @@ export class QuickTextStore {
   private pageSizes: PageDimensionsPt[] = [];
   private undoStack: QuickTextBox[][] = [];
   private redoStack: QuickTextBox[][] = [];
+  private lastEditKey: string | null = null;
+  private lastEditAt = 0;
   private saving = false;
   private error: string | null = null;
   private listeners = new Set<Listener>();
@@ -88,7 +118,7 @@ export class QuickTextStore {
   }
 
   addBox(pageIndex: number, xRatio: number, yRatio: number): QuickTextBox {
-    this.pruneEmptyActiveBox();
+    this.pruneEmptyBoxes();
     this.pushUndo();
     const box: QuickTextBox = {
       id: generateId(),
@@ -104,23 +134,35 @@ export class QuickTextStore {
     };
     this.boxes = [...this.boxes, box];
     this.activeBoxId = box.id;
+    // Coalesce initial typing right after box creation into the same undo step.
+    this.lastEditKey = `text:${box.id}`;
+    this.lastEditAt = Date.now();
     this.error = null;
     this.emit();
     return box;
   }
 
   selectBox(id: string | null): void {
-    if (this.activeBoxId === id) return;
-    if (id !== this.activeBoxId) {
-      this.pruneEmptyActiveBox();
-    }
-    this.activeBoxId = id;
+    const pruned = id !== this.activeBoxId ? this.pruneEmptyBoxes(id) : false;
+    if (this.activeBoxId === id && !pruned) return;
+    this.lastEditKey = null;
+    this.activeBoxId = id && this.boxes.some((b) => b.id === id) ? id : null;
     this.emit();
   }
 
   updateText(id: string, text: string): void {
     const idx = this.boxes.findIndex((b) => b.id === id);
     if (idx === -1 || this.boxes[idx].text === text) return;
+    const now = Date.now();
+    const editKey = `text:${id}`;
+    if (
+      this.lastEditKey !== editKey ||
+      now - this.lastEditAt > TEXT_UNDO_COALESCE_MS
+    ) {
+      this.pushUndo();
+    }
+    this.lastEditKey = editKey;
+    this.lastEditAt = now;
     const next = [...this.boxes];
     next[idx] = { ...next[idx], text };
     this.boxes = next;
@@ -240,10 +282,18 @@ export class QuickTextStore {
   }
 
   deleteBox(id: string): void {
-    const idx = this.boxes.findIndex((b) => b.id === id);
-    if (idx === -1) return;
-    this.pushUndo();
+    const target = this.boxes.find((b) => b.id === id);
+    if (!target) return;
+    const wasEmpty = target.text.trim().length === 0;
+    if (!wasEmpty) {
+      this.pushUndo();
+    } else {
+      this.lastEditKey = null;
+    }
     this.boxes = this.boxes.filter((b) => b.id !== id);
+    if (wasEmpty) {
+      this.dropRedundantUndoTop();
+    }
     if (this.activeBoxId === id) {
       this.activeBoxId = null;
     }
@@ -263,6 +313,8 @@ export class QuickTextStore {
     this.activeBoxId = null;
     this.undoStack = [];
     this.redoStack = [];
+    this.lastEditKey = null;
+    this.lastEditAt = 0;
     this.error = null;
     this.saving = false;
     this.emit();
@@ -271,6 +323,7 @@ export class QuickTextStore {
   undo(): void {
     const prev = this.undoStack.pop();
     if (!prev) return;
+    this.lastEditKey = null;
     this.redoStack.push(cloneBoxes(this.boxes));
     this.boxes = prev;
     if (
@@ -285,6 +338,7 @@ export class QuickTextStore {
   redo(): void {
     const next = this.redoStack.pop();
     if (!next) return;
+    this.lastEditKey = null;
     this.undoStack.push(cloneBoxes(this.boxes));
     this.boxes = next;
     if (
@@ -300,16 +354,33 @@ export class QuickTextStore {
     return this.boxes.filter((b) => b.text.trim().length > 0);
   }
 
-  private pruneEmptyActiveBox(): void {
-    if (!this.activeBoxId) return;
-    const active = this.boxes.find((b) => b.id === this.activeBoxId);
-    if (active && active.text.trim().length === 0) {
-      this.boxes = this.boxes.filter((b) => b.id !== active.id);
+  private pruneEmptyBoxes(keepId?: string | null): boolean {
+    const remaining = this.boxes.filter(
+      (b) => b.id === keepId || b.text.trim().length > 0,
+    );
+    if (remaining.length === this.boxes.length) return false;
+    this.boxes = remaining;
+    if (
+      this.activeBoxId &&
+      !this.boxes.some((b) => b.id === this.activeBoxId)
+    ) {
       this.activeBoxId = null;
+    }
+    this.dropRedundantUndoTop();
+    return true;
+  }
+
+  private dropRedundantUndoTop(): void {
+    while (
+      this.undoStack.length > 0 &&
+      boxesEqual(this.undoStack[this.undoStack.length - 1], this.boxes)
+    ) {
+      this.undoStack.pop();
     }
   }
 
   private pushUndo(): void {
+    this.lastEditKey = null;
     this.undoStack.push(cloneBoxes(this.boxes));
     if (this.undoStack.length > MAX_HISTORY) {
       this.undoStack.shift();
@@ -343,24 +414,43 @@ export interface QuickTextSessionActions {
   save: (download: boolean) => Promise<void>;
 }
 
-interface QuickTextSession {
+export interface QuickTextSession {
   store: QuickTextStore | null;
   actions: QuickTextSessionActions | null;
 }
 
-const session: QuickTextSession = {
+let session: QuickTextSession = {
   store: null,
   actions: null,
 };
+
+const sessionListeners = new Set<Listener>();
+
+function subscribeSession(listener: Listener): () => void {
+  sessionListeners.add(listener);
+  return () => {
+    sessionListeners.delete(listener);
+  };
+}
 
 export function setQuickTextSession(
   store: QuickTextStore | null,
   actions: QuickTextSessionActions | null,
 ): void {
-  session.store = store;
-  session.actions = actions;
+  session = { store, actions };
+  for (const listener of Array.from(sessionListeners)) {
+    listener();
+  }
 }
 
 export function getQuickTextSession(): QuickTextSession {
   return session;
+}
+
+export function useQuickTextSession(): QuickTextSession {
+  return useSyncExternalStore(
+    subscribeSession,
+    getQuickTextSession,
+    getQuickTextSession,
+  );
 }

@@ -8004,6 +8004,7 @@ vertical = "Regla vertical"
 
 [pdfTextEditor.run]
 lockedTitle = "Bloqueado: usa el botón Desbloquear para editar"
+placeholder = "Escribe aquí..."
 readOnlyOrderTitle = "El texto de esta línea no se puede editar: mezcla texto de derecha a izquierda y de izquierda a derecha en un orden que el editor no puede volver a dibujar de forma segura"
 resizeHandle = "Arrastra para cambiar el ancho; el texto se reajusta"
 

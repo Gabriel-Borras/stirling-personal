@@ -176,6 +176,22 @@ export class HistoryStack {
     this.lastCoalesceKey = null;
   }
 
+  /** Pop and revert the top command without recording it on the redo stack. */
+  discardTop(doc: EditorDocument): boolean {
+    const cmd = this.undoStack.pop();
+    if (!cmd) return false;
+    try {
+      cmd.revert(doc);
+    } catch (err) {
+      const failure = new HistoryStepError("revert", err);
+      if (failure.documentIntact) this.undoStack.push(cmd);
+      this.lastCoalesceKey = null;
+      throw failure;
+    }
+    this.lastCoalesceKey = null;
+    return true;
+  }
+
   /** End the coalescing burst so the next execute starts a fresh undo step. */
   breakCoalescing(): void {
     this.lastCoalesceKey = null;

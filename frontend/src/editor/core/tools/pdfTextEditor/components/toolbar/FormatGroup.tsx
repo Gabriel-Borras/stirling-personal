@@ -354,6 +354,7 @@ export function FormatGroup({
         <Button
           {...toggleLook(state.bold, state.mixed.bold)}
           size={buttonSize}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => void warnAbout(onToggleBold)}
           disabled={!state.canBold || selectionTextReadOnly}
           aria-label={t(...BOLD_TEXTS.name)}
@@ -374,6 +375,7 @@ export function FormatGroup({
         <Button
           {...toggleLook(state.italic, state.mixed.italic)}
           size={buttonSize}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => void warnAbout(onToggleItalic)}
           disabled={!state.canItalic || selectionTextReadOnly}
           aria-label={t(...ITALIC_TEXTS.name)}

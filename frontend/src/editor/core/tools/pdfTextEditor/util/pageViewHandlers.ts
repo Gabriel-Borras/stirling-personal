@@ -16,6 +16,33 @@ import { SetImageTransformCommand } from "@editor/tools/pdfTextEditor/commands/S
 import type { TextRange } from "@editor/tools/pdfTextEditor/types";
 import type { EditorStore } from "@editor/tools/pdfTextEditor/store/EditorStore";
 
+const ADD_TEXT_BASELINE_OFFSET_PT = 4;
+const FOCUS_MOUNT_FRAMES = 30;
+
+function focusRunWhenMounted(store: EditorStore, runId: string): void {
+  if (typeof window === "undefined") return;
+  let remaining = FOCUS_MOUNT_FRAMES;
+  const attempt = () => {
+    if (
+      store.selection.value.runIds.length !== 1 ||
+      store.selection.value.runIds[0] !== runId
+    ) {
+      return;
+    }
+    const el = document.querySelector<HTMLElement>(
+      `[data-testid="pdf-editor-run-${CSS.escape(runId)}"]`,
+    );
+    if (el) {
+      el.focus({ preventScroll: true });
+      return;
+    }
+    if (remaining-- > 0) {
+      window.requestAnimationFrame(attempt);
+    }
+  };
+  window.requestAnimationFrame(attempt);
+}
+
 const cache = new WeakMap<EditorStore, PageViewHandlers>();
 
 /**
@@ -113,6 +140,9 @@ function createHandlers(store: EditorStore) {
       const cmd = doc && resizeRunCommand(doc, pageIndex, runId, widthPt);
       if (cmd) store.dispatch(cmd);
     },
+    onDiscardEmptyRun: (pageIndex: number, runId: string) => {
+      store.discardEmptyInsert(pageIndex, runId);
+    },
     onPageClick: (pageIndex: number, pageX: number, pageY: number) => {
       const { mode } = store.getState();
       if (mode === "addTable") {
@@ -130,14 +160,28 @@ function createHandlers(store: EditorStore) {
         return;
       }
       if (mode !== "addText") return;
+      const page = store.document?.page(pageIndex);
+      // Offset baseline downward so cap-height lands centred on the clicked point.
+      const anchor = page
+        ? (() => {
+            const display = page.display.apply(pageX, pageY);
+            return page.display.invert(
+              display.x,
+              Math.max(0, display.y - ADD_TEXT_BASELINE_OFFSET_PT),
+            );
+          })()
+        : { x: pageX, y: pageY };
       const cmd = new InsertTextCommand({
         pageIndex,
-        x: pageX,
-        y: pageY,
-        text: "New text",
+        x: anchor.x,
+        y: anchor.y,
+        text: "",
       });
       store.dispatch(cmd);
-      if (cmd.insertedRunId) store.selection.selectOne(cmd.insertedRunId);
+      if (cmd.insertedRunId) {
+        store.selection.selectOne(cmd.insertedRunId);
+        focusRunWhenMounted(store, cmd.insertedRunId);
+      }
       store.setMode("select");
     },
     onTransformImage: (

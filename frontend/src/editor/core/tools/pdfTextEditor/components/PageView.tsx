@@ -104,6 +104,8 @@ interface PageViewProps {
   onMeasureRun?: (pageIndex: number, runId: string) => TextRunSnapshot | null;
   /** Right-edge drag to a new box width; widthPt in PDF points. */
   onResizeRun?: (pageIndex: number, runId: string, widthPt: number) => void;
+  /** Fires when an untouched newly inserted empty run blurs or is dismissed. */
+  onDiscardEmptyRun?: (pageIndex: number, runId: string) => void;
   /** Fires when the user clicks on a non-text area of the page. */
   onPageClick?: (pageIndex: number, pageX: number, pageY: number) => void;
   /** Fires when an image's drag OR resize completes. */
@@ -158,6 +160,7 @@ export const PageView = memo(function PageView({
   onWrapRun,
   onMeasureRun,
   onResizeRun,
+  onDiscardEmptyRun,
   onPageClick,
   onTransformImage,
   onFirstVisible,
@@ -581,6 +584,11 @@ export const PageView = memo(function PageView({
             onResize={
               onResizeRun && canResizeRun(run)
                 ? (widthPt) => onResizeRun(page.pageIndex, run.id, widthPt)
+                : undefined
+            }
+            onDiscardEmpty={
+              onDiscardEmptyRun
+                ? () => onDiscardEmptyRun(page.pageIndex, run.id)
                 : undefined
             }
           />

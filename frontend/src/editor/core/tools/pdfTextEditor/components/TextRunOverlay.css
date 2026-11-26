@@ -42,6 +42,14 @@
   text-decoration-color: transparent !important;
 }
 
+.pdf-editor-run.is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--c-text-subtle) !important;
+  -webkit-text-fill-color: var(--c-text-subtle) !important;
+  opacity: 0.75;
+  pointer-events: none;
+}
+
 .pdf-editor-run.is-pristine::selection,
 .pdf-editor-run.is-pristine *::selection {
   background: color-mix(in srgb, var(--c-primary) 28%, transparent);

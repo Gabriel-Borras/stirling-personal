@@ -2,18 +2,21 @@ import { useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@editor/ui/Button";
 import { Icon } from "@editor/ui/Icon";
-import { getQuickTextSession } from "@editor/tools/quickText/QuickTextStore";
+import { useQuickTextSession } from "@editor/tools/quickText/QuickTextStore";
 import "@editor/tools/quickText/QuickText.css";
+
+const EMPTY_SUBSCRIBE = () => () => {};
+const NULL_SNAPSHOT = () => null;
 
 /**
  * Top action bar docked above the PDF viewer pages while Quick Text is active.
  */
 export function QuickTextToolbar() {
   const { t } = useTranslation();
-  const { store, actions } = getQuickTextSession();
+  const { store, actions } = useQuickTextSession();
   const snapshot = useSyncExternalStore(
-    store ? store.subscribe : () => () => {},
-    store ? store.getSnapshot : () => null,
+    store ? store.subscribe : EMPTY_SUBSCRIBE,
+    store ? store.getSnapshot : NULL_SNAPSHOT,
   );
 
   if (!store || !snapshot) return null;
@@ -21,6 +24,9 @@ export function QuickTextToolbar() {
   const nonEmptyCount = snapshot.boxes.filter(
     (b) => b.text.trim().length > 0,
   ).length;
+  const keepFocus = (event: React.MouseEvent) => {
+    event.preventDefault();
+  };
 
   return (
     <div className="quick-text-top-bar" data-testid="quick-text-top-bar">
@@ -46,6 +52,7 @@ export function QuickTextToolbar() {
           variant="tertiary"
           accent="neutral"
           disabled={!snapshot.canUndo || snapshot.saving}
+          onMouseDown={keepFocus}
           onClick={() => store.undo()}
           title={t("quickText.actions.undo", "Undo")}
           aria-label={t("quickText.actions.undo", "Undo")}
@@ -58,6 +65,7 @@ export function QuickTextToolbar() {
           variant="tertiary"
           accent="neutral"
           disabled={!snapshot.canRedo || snapshot.saving}
+          onMouseDown={keepFocus}
           onClick={() => store.redo()}
           title={t("quickText.actions.redo", "Redo")}
           aria-label={t("quickText.actions.redo", "Redo")}
@@ -71,6 +79,7 @@ export function QuickTextToolbar() {
             variant="tertiary"
             accent="neutral"
             disabled={snapshot.saving}
+            onMouseDown={keepFocus}
             onClick={() => store.clearAll()}
           >
             {t("quickText.actions.clearAll", "Clear")}

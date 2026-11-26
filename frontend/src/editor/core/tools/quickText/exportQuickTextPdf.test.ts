@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PDFDocument } from "@cantoo/pdf-lib";
+import { degrees, PDFDocument } from "@cantoo/pdf-lib";
 import {
   embedQuickTextIntoPdf,
   readPdfPageDimensions,
@@ -15,13 +15,66 @@ async function createBlankPdf(pageCount = 2): Promise<Uint8Array> {
 }
 
 describe("exportQuickTextPdf", () => {
-  it("reads page dimensions accurately", async () => {
+  it("reads page dimensions and rotation accurately", async () => {
     const bytes = await createBlankPdf(2);
     const dims = await readPdfPageDimensions(bytes);
     expect(dims).toEqual([
-      { width: 600, height: 800 },
-      { width: 600, height: 800 },
+      { width: 600, height: 800, rotation: 0 },
+      { width: 600, height: 800, rotation: 0 },
     ]);
+  });
+
+  it("embeds formatted text boxes onto rotated pages", async () => {
+    const doc = await PDFDocument.create();
+    for (const angle of [90, 180, 270]) {
+      const page = doc.addPage([600, 800]);
+      page.setRotation(degrees(angle));
+    }
+    const source = await doc.save();
+    const dims = await readPdfPageDimensions(source);
+    expect(dims.map((d) => d.rotation)).toEqual([90, 180, 270]);
+
+    const outBytes = await embedQuickTextIntoPdf(source, [
+      {
+        id: "r90",
+        pageIndex: 0,
+        xRatio: 0.25,
+        yRatio: 0.25,
+        text: "Rotated 90",
+        fontSizePt: 14,
+        bold: false,
+        italic: false,
+        underline: true,
+        color: "black",
+      },
+      {
+        id: "r180",
+        pageIndex: 1,
+        xRatio: 0.3,
+        yRatio: 0.4,
+        text: "Rotated 180",
+        fontSizePt: 12,
+        bold: true,
+        italic: false,
+        underline: false,
+        color: "blue",
+      },
+      {
+        id: "r270",
+        pageIndex: 2,
+        xRatio: 0.5,
+        yRatio: 0.5,
+        text: "Rotated 270",
+        fontSizePt: 16,
+        bold: false,
+        italic: true,
+        underline: true,
+        color: "red",
+      },
+    ]);
+    const parsed = await PDFDocument.load(outBytes);
+    expect(parsed.getPageCount()).toBe(3);
+    expect(outBytes.byteLength).toBeGreaterThan(source.byteLength);
   });
 
   it("embeds formatted text boxes across pages into valid PDF bytes", async () => {

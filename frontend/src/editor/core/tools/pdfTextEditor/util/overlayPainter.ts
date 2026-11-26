@@ -1,5 +1,6 @@
 import {
   fitTokenAdvance,
+  NO_TOKEN_FIT,
   type TokenFit,
 } from "@editor/tools/pdfTextEditor/util/lineLayout";
 import { measureAdvancePx } from "@editor/tools/pdfTextEditor/util/textMetrics";
@@ -165,6 +166,10 @@ function predictedAdvance(
 }
 
 function tokenFitFor(token: PaintToken, opts: PaintOptions): TokenFit {
+  // Trailing spaces trimmed by the engine report zero advance; collapsing them pulls the caret back onto the prior glyph.
+  if (token.advancePx === 0 && /^\s+$/.test(token.text)) {
+    return NO_TOKEN_FIT;
+  }
   const natural = measureAdvancePx(token.text, opts.font);
   return fitTokenAdvance(
     [...token.text].length,

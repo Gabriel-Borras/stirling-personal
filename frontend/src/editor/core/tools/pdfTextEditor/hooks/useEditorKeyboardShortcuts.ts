@@ -45,6 +45,24 @@ export function useEditorKeyboardShortcuts(cbs: KeyboardShortcutCallbacks) {
   } = cbs;
 
   useEffect(() => {
+    // Re-focuses the run after a temporary blur for history/save sync so the next Backspace edits text instead of deleting the whole box.
+    function refocusRunAfterSync(runId: string | undefined) {
+      if (!runId) return;
+      window.requestAnimationFrame(() => {
+        if (
+          document.activeElement &&
+          document.activeElement !== document.body
+        ) {
+          return;
+        }
+        if (!store.selection.value.runIds.includes(runId)) return;
+        const el = document.querySelector<HTMLElement>(
+          `[data-run-id="${CSS.escape(runId)}"]`,
+        );
+        el?.focus({ preventScroll: true });
+      });
+    }
+
     function onMetaKey(e: KeyboardEvent) {
       const meta = e.ctrlKey || e.metaKey;
       if (!meta) return;
@@ -52,13 +70,16 @@ export function useEditorKeyboardShortcuts(cbs: KeyboardShortcutCallbacks) {
       const key = e.key.toLowerCase();
       if (key !== "s" && isModalOpen()) return;
       switch (key) {
-        case "z":
+        case "z": {
           // Form fields (Find/Replace/password) keep their NATIVE undo.
           if (isFocusInFormField()) return;
+          const activeEl = isFocusInContentEditable()
+            ? (document.activeElement as HTMLElement | null)
+            : null;
+          const runId = activeEl?.dataset?.runId;
           // Blur an active editable before history so the overlay sync
           // effect can rewrite the DOM from the reverted model.
-          if (isFocusInContentEditable())
-            (document.activeElement as HTMLElement | null)?.blur();
+          activeEl?.blur();
           if (e.shiftKey) {
             e.preventDefault();
             onRedo();
@@ -66,22 +87,34 @@ export function useEditorKeyboardShortcuts(cbs: KeyboardShortcutCallbacks) {
             e.preventDefault();
             onUndo();
           }
+          refocusRunAfterSync(runId);
           return;
-        case "y":
+        }
+        case "y": {
           if (isFocusInFormField()) return;
-          if (isFocusInContentEditable())
-            (document.activeElement as HTMLElement | null)?.blur();
+          const activeEl = isFocusInContentEditable()
+            ? (document.activeElement as HTMLElement | null)
+            : null;
+          const runId = activeEl?.dataset?.runId;
+          activeEl?.blur();
           e.preventDefault();
           onRedo();
+          refocusRunAfterSync(runId);
           return;
-        case "s":
+        }
+        case "s": {
           e.preventDefault();
+          const activeEl = isFocusInContentEditable()
+            ? (document.activeElement as HTMLElement | null)
+            : null;
+          const runId = activeEl?.dataset?.runId;
           // Commit the in-progress edit first: blur bakes the pending
           // text + wrap reflow, otherwise the download misses them.
-          if (isFocusInContentEditable())
-            (document.activeElement as HTMLElement | null)?.blur();
+          activeEl?.blur();
           onSave();
+          refocusRunAfterSync(runId);
           return;
+        }
         case "d":
           // No focus guard: duplicate must work while a run's editable is
           // focused.
@@ -147,6 +180,16 @@ export function useEditorKeyboardShortcuts(cbs: KeyboardShortcutCallbacks) {
       // Mac keyboards have no Delete key; their ⌫ arrives as Backspace.
       if (e.key === "Delete" || e.key === "Backspace") {
         if (isFocusInContentEditable()) return;
+        // A toolbar button receiving focus after a format click must not turn Backspace into deleting the whole text block.
+        if (
+          e.key === "Backspace" &&
+          document.activeElement instanceof Element &&
+          document.activeElement.closest(
+            "button, [role='button'], [role='menuitem']",
+          )
+        ) {
+          return;
+        }
         const sel = store.selection.value;
         if (
           sel.runIds.length === 0 &&

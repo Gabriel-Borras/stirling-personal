@@ -89,7 +89,7 @@ export class DeleteObjectCommand implements Command {
       renderScanEdit(doc, page, run, run.scanEdit!, this.scanText);
       return;
     }
-    if (!this.removedRun || this.cachedPtrs.length === 0) return;
+    if (!this.removedRun) return;
     const page = doc.page(this.pageIndex);
     const m = doc.module;
     const formMod = m as unknown as {

@@ -12,6 +12,7 @@ import { emitFallbackTextObject } from "@editor/tools/pdfTextEditor/util/fallbac
 
 const DEFAULT_FAMILY = "Helvetica";
 const DEFAULT_SIZE = 12;
+const DEFAULT_EMPTY_WIDTH_PT = 120;
 
 // Create a brand-new text object on the given page at the given page-space
 // point.
@@ -47,42 +48,46 @@ export class InsertTextCommand implements Command {
     const page = doc.page(this.pageIndex);
     const m = doc.module;
 
-    // Base-14 can only render WinAnsi.
-    const sanitized = sanitizeForBase14(this.text);
     let objPtr = 0;
-    if ([...this.text].length > [...sanitized].length) {
-      objPtr = emitFallbackTextObject(
-        doc,
-        page,
-        this.text,
-        DEFAULT_SIZE,
-        BLACK,
-        this.x,
-        this.y,
-      );
-    }
-    if (!objPtr) {
-      objPtr = m.FPDFPageObj_NewTextObj(
-        doc.docPtr,
-        DEFAULT_FAMILY,
-        DEFAULT_SIZE,
-      );
-      if (!objPtr) return;
-      const textPtr = writeUtf16(m, sanitized);
-      try {
-        m.FPDFText_SetText(objPtr, textPtr);
-      } finally {
-        m.pdfium.wasmExports.free(textPtr);
+    if (this.text.length > 0) {
+      // Base-14 can only render WinAnsi.
+      const sanitized = sanitizeForBase14(this.text);
+      if ([...this.text].length > [...sanitized].length) {
+        objPtr = emitFallbackTextObject(
+          doc,
+          page,
+          this.text,
+          DEFAULT_SIZE,
+          BLACK,
+          this.x,
+          this.y,
+        );
       }
-      m.FPDFPageObj_SetFillColor(objPtr, BLACK.r, BLACK.g, BLACK.b, BLACK.a);
-      m.FPDFPageObj_Transform(objPtr, 1, 0, 0, 1, this.x, this.y);
-      m.FPDFPage_InsertObject(page.pagePtr, objPtr);
+      if (!objPtr) {
+        objPtr = m.FPDFPageObj_NewTextObj(
+          doc.docPtr,
+          DEFAULT_FAMILY,
+          DEFAULT_SIZE,
+        );
+        if (!objPtr) return;
+        const textPtr = writeUtf16(m, sanitized);
+        try {
+          m.FPDFText_SetText(objPtr, textPtr);
+        } finally {
+          m.pdfium.wasmExports.free(textPtr);
+        }
+        m.FPDFPageObj_SetFillColor(objPtr, BLACK.r, BLACK.g, BLACK.b, BLACK.a);
+        m.FPDFPageObj_Transform(objPtr, 1, 0, 0, 1, this.x, this.y);
+        m.FPDFPage_InsertObject(page.pagePtr, objPtr);
+      }
     }
 
     // On a /Rotate page, counter-rotate the new object about its anchor so it
     // reads upright in the displayed orientation rather than landing sideways.
     const rot = counterPageRotation(page.display.rotate);
-    if (rot) rotateObjectAbout(m, objPtr, this.x, this.y, rot.cos, rot.sin);
+    if (rot && objPtr) {
+      rotateObjectAbout(m, objPtr, this.x, this.y, rot.cos, rot.sin);
+    }
     const matrix = rot
       ? {
           a: rot.cos,
@@ -97,6 +102,10 @@ export class InsertTextCommand implements Command {
     // Kept across redo: later steps that edit this text find it by this id.
     const runId =
       this.createdRunId ?? `p${page.index}-new-${page.runs.length}-${objPtr}`;
+    const width =
+      this.text.length > 0
+        ? this.text.length * DEFAULT_SIZE * 0.6
+        : DEFAULT_EMPTY_WIDTH_PT;
     const run = new TextRun({
       id: runId,
       pageIndex: page.index,
@@ -104,7 +113,7 @@ export class InsertTextCommand implements Command {
       bounds: {
         x: this.x,
         y: this.y,
-        width: this.text.length * DEFAULT_SIZE * 0.6,
+        width,
         height: DEFAULT_SIZE * 1.2,
       },
       matrix,
@@ -123,12 +132,12 @@ export class InsertTextCommand implements Command {
   }
 
   revert(doc: EditorDocument): void {
-    if (!this.createdObjPtr) return;
+    if (!this.createdRunId) return;
     const page = doc.page(this.pageIndex);
-    doc.module.FPDFPage_RemoveObject(page.pagePtr, this.createdObjPtr);
-    if (this.createdRunId) {
-      page.setRuns(page.runs.filter((r) => r.id !== this.createdRunId));
+    if (this.createdObjPtr) {
+      doc.module.FPDFPage_RemoveObject(page.pagePtr, this.createdObjPtr);
     }
+    page.setRuns(page.runs.filter((r) => r.id !== this.createdRunId));
     page.markDirty();
     page.markNeedsGenerate();
   }

@@ -4,7 +4,7 @@ import type { ViewerPageLayerProps } from "@editor/contexts/viewer/ViewerPageToo
 import { Icon } from "@editor/ui/Icon";
 import { QuickTextFloatingToolbar } from "@editor/tools/quickText/QuickTextFloatingToolbar";
 import {
-  getQuickTextSession,
+  useQuickTextSession,
   type QuickTextStore,
 } from "@editor/tools/quickText/QuickTextStore";
 import {
@@ -15,6 +15,14 @@ import "@editor/tools/quickText/QuickText.css";
 
 const FALLBACK_PAGE_WIDTH_PT = 612;
 const FLIP_TOOLBAR_Y_THRESHOLD = 0.09;
+const CLICK_DRAG_THRESHOLD_PX = 5;
+const EMPTY_SUBSCRIBE = () => () => {};
+const NULL_SNAPSHOT = () => null;
+
+function normalizeQuarterTurns(angle: number | undefined): number {
+  if (!angle) return 0;
+  return ((Math.round(angle / 90) % 4) + 4) % 4;
+}
 
 interface InlineTextBoxItemProps {
   box: QuickTextBox;
@@ -35,16 +43,21 @@ function InlineTextBoxItem({
 }: InlineTextBoxItemProps) {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const dragCleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => () => dragCleanupRef.current?.(), []);
 
   useEffect(() => {
-    if (isActive && textareaRef.current) {
-      textareaRef.current.focus();
+    const textarea = textareaRef.current;
+    if (isActive && textarea && document.activeElement !== textarea) {
+      textarea.focus();
     }
   }, [isActive]);
 
   const startDrag = (event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
+    dragCleanupRef.current?.();
     store.selectBox(box.id);
 
     const startClientX = event.clientX;
@@ -68,26 +81,54 @@ function InlineTextBoxItem({
       );
     };
 
-    const handleMouseUp = () => {
+    const cleanup = () => {
       window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("mouseup", cleanup);
+      dragCleanupRef.current = null;
     };
 
+    dragCleanupRef.current = cleanup;
     window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("mouseup", cleanup);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
+      textareaRef.current?.blur();
       store.selectBox(null);
+      return;
+    }
+
+    if (
+      event.key === "Backspace" &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      box.text.length === 0
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      store.deleteBox(box.id);
       return;
     }
 
     if (event.ctrlKey || event.metaKey) {
       const key = event.key.toLowerCase();
-      if (key === "b") {
+      if (key === "z") {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.shiftKey) {
+          store.redo();
+        } else {
+          store.undo();
+        }
+      } else if (key === "y") {
+        event.preventDefault();
+        event.stopPropagation();
+        store.redo();
+      } else if (key === "b") {
         event.preventDefault();
         store.toggleBold(box.id);
       } else if (key === "i") {
@@ -101,7 +142,7 @@ function InlineTextBoxItem({
   };
 
   const colorOption = getQuickTextColorOption(box.color);
-  const fontSizePx = Math.max(8, box.fontSizePt * scale);
+  const fontSizePx = Math.max(4, box.fontSizePt * scale);
   const placeholder = t("quickText.placeholder", "Type text here");
 
   const textStyle: React.CSSProperties = {
@@ -122,15 +163,16 @@ function InlineTextBoxItem({
         top: `${box.yRatio * 100}%`,
       }}
       data-testid="quick-text-box"
+      data-quick-text-box-id={box.id}
       onClick={(e) => {
         e.stopPropagation();
         store.selectBox(box.id);
       }}
       onMouseDown={(e) => {
-        if (!isActive) {
+        e.stopPropagation();
+        // Drag when grabbing the box frame itself; clicks inside the textarea keep native caret placement.
+        if (e.target === e.currentTarget) {
           startDrag(e);
-        } else {
-          e.stopPropagation();
         }
       }}
     >
@@ -148,16 +190,14 @@ function InlineTextBoxItem({
         />
       )}
 
-      {isActive && (
-        <span
-          className="quick-text-drag-handle"
-          title={t("quickText.dragToMove", "Drag to move")}
-          onMouseDown={startDrag}
-          data-testid="quick-text-drag-handle"
-        >
-          <Icon name="grip-vertical" size={14} />
-        </span>
-      )}
+      <span
+        className="quick-text-drag-handle"
+        title={t("quickText.dragToMove", "Drag to move")}
+        onMouseDown={startDrag}
+        data-testid="quick-text-drag-handle"
+      >
+        <Icon name="grip-vertical" size={14} />
+      </span>
 
       <div className="quick-text-editor-wrap">
         <span
@@ -195,28 +235,53 @@ export function QuickTextPageLayer({
   width,
   height,
 }: ViewerPageLayerProps) {
-  const { store } = getQuickTextSession();
+  const { store } = useQuickTextSession();
   const snapshot = useSyncExternalStore(
-    store ? store.subscribe : () => () => {},
-    store ? store.getSnapshot : () => null,
+    store ? store.subscribe : EMPTY_SUBSCRIBE,
+    store ? store.getSnapshot : NULL_SNAPSHOT,
   );
+  const pointerDownPosRef = useRef<{ x: number; y: number } | null>(null);
 
   if (!store || !snapshot) return null;
 
+  const pageMeta = snapshot.pageSizes[pageIndex];
+  const quarterTurns = normalizeQuarterTurns(pageMeta?.rotation);
+  const sideways = quarterTurns % 2 === 1;
+  const displayWidth = sideways ? height : width;
+  const displayHeight = sideways ? width : height;
+  const pdfDisplayWidthPt = sideways
+    ? (pageMeta?.height ?? FALLBACK_PAGE_WIDTH_PT)
+    : (pageMeta?.width ?? FALLBACK_PAGE_WIDTH_PT);
+  const scale = pdfDisplayWidthPt > 0 ? displayWidth / pdfDisplayWidthPt : 1;
+
   const pageBoxes = snapshot.boxes.filter((b) => b.pageIndex === pageIndex);
-  const pdfWidthPt =
-    snapshot.pageSizes[pageIndex]?.width ?? FALLBACK_PAGE_WIDTH_PT;
-  const scale = pdfWidthPt > 0 ? width / pdfWidthPt : 1;
+
+  const handleLayerMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget) {
+      pointerDownPosRef.current = { x: event.clientX, y: event.clientY };
+    } else {
+      pointerDownPosRef.current = null;
+    }
+  };
 
   const handleLayerClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.target !== event.currentTarget) return;
-    if (width <= 0 || height <= 0) return;
+    const downPos = pointerDownPosRef.current;
+    pointerDownPosRef.current = null;
+    // Ignore clicks resulting from a drag-selection that started inside a box and ended on the layer.
+    if (!downPos || event.target !== event.currentTarget) return;
+    if (
+      Math.hypot(event.clientX - downPos.x, event.clientY - downPos.y) >
+      CLICK_DRAG_THRESHOLD_PX
+    ) {
+      return;
+    }
+    if (displayWidth <= 0 || displayHeight <= 0) return;
 
     const rect = event.currentTarget.getBoundingClientRect();
     const clickX = event.clientX - rect.left;
     const clickY = event.clientY - rect.top;
 
-    // Offset slightly upward so the text baseline lands where the user clicked.
+    // Offset upward so the text baseline lands where the user clicked.
     const fontOffsetPx = snapshot.defaults.fontSizePt * scale * 0.6;
     const xRatio = clickX / rect.width;
     const yRatio = Math.max(0, (clickY - fontOffsetPx) / rect.height);
@@ -224,10 +289,23 @@ export function QuickTextPageLayer({
     store.addBox(pageIndex, xRatio, yRatio);
   };
 
+  const layerStyle: React.CSSProperties | undefined = quarterTurns
+    ? {
+        inset: "auto",
+        left: (width - displayWidth) / 2,
+        top: (height - displayHeight) / 2,
+        width: displayWidth,
+        height: displayHeight,
+        transform: `rotate(${-90 * quarterTurns}deg)`,
+      }
+    : undefined;
+
   return (
     <div
       className="quick-text-page-layer"
+      style={layerStyle}
       data-testid={`quick-text-page-layer-${pageIndex}`}
+      onMouseDown={handleLayerMouseDown}
       onClick={handleLayerClick}
     >
       {pageBoxes.map((box) => (
@@ -235,8 +313,8 @@ export function QuickTextPageLayer({
           key={box.id}
           box={box}
           isActive={snapshot.activeBoxId === box.id}
-          pageWidth={width}
-          pageHeight={height}
+          pageWidth={displayWidth}
+          pageHeight={displayHeight}
           scale={scale}
           store={store}
         />

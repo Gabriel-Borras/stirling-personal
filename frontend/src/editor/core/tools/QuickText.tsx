@@ -117,7 +117,18 @@ const QuickText = (_props: BaseToolProps) => {
 
   useEffect(() => {
     setHasUnsavedChanges(snapshot.dirty);
+    if (!snapshot.dirty) {
+      return () => {
+        setHasUnsavedChanges(false);
+      };
+    }
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
     return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
       setHasUnsavedChanges(false);
     };
   }, [snapshot.dirty, setHasUnsavedChanges]);
@@ -219,7 +230,25 @@ const QuickText = (_props: BaseToolProps) => {
     };
   }, [store, saveToPdf]);
 
-  // Global undo/redo & delete shortcuts when not typing in an input.
+  // Deselect when clicking outside boxes/toolbars so a blurred box never stays visually active.
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!store.getSnapshot().activeBoxId) return;
+      const target = event.target as Element | null;
+      if (
+        target?.closest(
+          ".quick-text-box, .quick-text-floating-toolbar, .quick-text-top-bar, [data-quick-text-sidebar-item]",
+        )
+      ) {
+        return;
+      }
+      store.selectBox(null);
+    };
+
+    window.addEventListener("mousedown", handlePointerDown);
+    return () => window.removeEventListener("mousedown", handlePointerDown);
+  }, [store]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const el = document.activeElement as HTMLElement | null;
@@ -243,8 +272,11 @@ const QuickText = (_props: BaseToolProps) => {
         event.preventDefault();
         store.redo();
       } else if (
-        (event.key === "Delete" || event.key === "Backspace") &&
-        store.getSnapshot().activeBoxId
+        event.key === "Delete" &&
+        store.getSnapshot().activeBoxId &&
+        el?.tagName !== "BUTTON" &&
+        el?.tagName !== "A" &&
+        el?.tagName !== "SELECT"
       ) {
         event.preventDefault();
         const id = store.getSnapshot().activeBoxId;
@@ -319,6 +351,7 @@ const QuickText = (_props: BaseToolProps) => {
                     {nonEmptyBoxes.map((box) => (
                       <Group
                         key={box.id}
+                        data-quick-text-sidebar-item
                         justify="space-between"
                         wrap="nowrap"
                         gap="xs"
@@ -336,6 +369,13 @@ const QuickText = (_props: BaseToolProps) => {
                         onClick={() => {
                           store.selectBox(box.id);
                           scrollActions.scrollToPage(box.pageIndex + 1);
+                          requestAnimationFrame(() => {
+                            document
+                              .querySelector<HTMLTextAreaElement>(
+                                `[data-quick-text-box-id="${CSS.escape(box.id)}"] textarea`,
+                              )
+                              ?.focus();
+                          });
                         }}
                       >
                         <Text size="xs" truncate style={{ flex: 1 }}>

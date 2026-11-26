@@ -131,3 +131,42 @@ describe("Bold and Italic", () => {
     expect(cbs.onToggleBold).not.toHaveBeenCalled();
   });
 });
+
+describe("Backspace and Undo focus safety", () => {
+  test("Backspace while a toolbar button has focus does not delete the selected run", () => {
+    const cbs = setup();
+    const button = document.createElement("button");
+    document.body.append(button);
+    button.focus();
+
+    press("Backspace");
+    expect(cbs.onDelete).not.toHaveBeenCalled();
+
+    press("Delete");
+    expect(cbs.onDelete).toHaveBeenCalledTimes(1);
+  });
+
+  test("Ctrl+Z inside an edited run refocuses it on the next frame so Backspace edits characters", () => {
+    const raf = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((cb) => {
+        cb(0);
+        return 1;
+      });
+    try {
+      const cbs = setup();
+      const run = document.createElement("div");
+      run.contentEditable = "true";
+      run.tabIndex = 0;
+      run.dataset.runId = "p0-t0";
+      document.body.append(run);
+      run.focus();
+
+      press("z", { ctrlKey: true });
+      expect(cbs.onUndo).toHaveBeenCalledTimes(1);
+      expect(document.activeElement).toBe(run);
+    } finally {
+      raf.mockRestore();
+    }
+  });
+});

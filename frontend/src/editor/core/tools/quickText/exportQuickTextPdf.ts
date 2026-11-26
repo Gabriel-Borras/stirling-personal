@@ -40,9 +40,51 @@ function sanitizeForFont(text: string, font: PDFFont): string {
   }
 }
 
+function normalizeRotationAngle(angle: number): 0 | 90 | 180 | 270 {
+  const normalized = (((Math.round(angle / 90) * 90) % 360) + 360) % 360;
+  if (normalized === 90 || normalized === 180 || normalized === 270) {
+    return normalized;
+  }
+  return 0;
+}
+
 /**
- * Reads each page's point dimensions from a PDF so the inline overlay can map
- * PDF point font sizes 1:1 onto zoomed CSS pixels.
+ * Maps a point `(displayX, displayYFromTop)` in upright display points back
+ * into raw PDF crop-box coordinates for the page's `/Rotate` angle.
+ */
+function displayPointToPdf(
+  cropBox: { x: number; y: number; width: number; height: number },
+  rotation: 0 | 90 | 180 | 270,
+  displayX: number,
+  displayYFromTop: number,
+): { x: number; y: number } {
+  switch (rotation) {
+    case 90:
+      return {
+        x: cropBox.x + displayYFromTop,
+        y: cropBox.y + displayX,
+      };
+    case 180:
+      return {
+        x: cropBox.x + cropBox.width - displayX,
+        y: cropBox.y + displayYFromTop,
+      };
+    case 270:
+      return {
+        x: cropBox.x + cropBox.width - displayYFromTop,
+        y: cropBox.y + cropBox.height - displayX,
+      };
+    default:
+      return {
+        x: cropBox.x + displayX,
+        y: cropBox.y + cropBox.height - displayYFromTop,
+      };
+  }
+}
+
+/**
+ * Reads each page's point dimensions and `/Rotate` angle from a PDF so the
+ * inline overlay maps PDF point font sizes and orientation 1:1.
  */
 export async function readPdfPageDimensions(
   pdfBytes: Uint8Array,
@@ -51,13 +93,17 @@ export async function readPdfPageDimensions(
   const doc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
   return doc.getPages().map((page) => {
     const box = page.getCropBox();
-    return { width: box.width, height: box.height };
+    return {
+      width: box.width,
+      height: box.height,
+      rotation: normalizeRotationAngle(page.getRotation().angle),
+    };
   });
 }
 
 /**
  * Draws all non-empty Quick Text boxes into the given PDF bytes, preserving
- * position, font size, bold/italic weight, underline, and text color.
+ * position, font size, bold/italic weight, underline, page rotation, and color.
  */
 export async function embedQuickTextIntoPdf(
   pdfBytes: Uint8Array,
@@ -71,6 +117,7 @@ export async function embedQuickTextIntoPdf(
   const {
     PDFDocument,
     StandardFonts: PdfStandardFonts,
+    degrees,
     rgb,
   } = await import("@cantoo/pdf-lib");
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
@@ -97,6 +144,11 @@ export async function embedQuickTextIntoPdf(
     if (!page) continue;
 
     const cropBox = page.getCropBox();
+    const rotation = normalizeRotationAngle(page.getRotation().angle);
+    const sideways = rotation === 90 || rotation === 270;
+    const displayWidth = sideways ? cropBox.height : cropBox.width;
+    const displayHeight = sideways ? cropBox.width : cropBox.height;
+
     const font = await getFont(getFontVariantKey(box));
     const colorOption = getQuickTextColorOption(box.color);
     const pdfColor = rgb(
@@ -109,31 +161,50 @@ export async function embedQuickTextIntoPdf(
     const lineHeight = fontSize * LINE_HEIGHT_MULTIPLIER;
     const lines = box.text.replace(/\r\n/g, "\n").split("\n");
 
-    const x = cropBox.x + box.xRatio * cropBox.width;
-    // PDF y=0 is at the bottom of the page; place the first baseline one ascent below the box top.
-    const topY = cropBox.y + cropBox.height - box.yRatio * cropBox.height;
+    const displayX = box.xRatio * displayWidth;
+    const displayTopY = box.yRatio * displayHeight;
     const ascentOffset = fontSize * 0.85;
 
     for (let i = 0; i < lines.length; i += 1) {
       const rawLine = lines[i];
       if (!rawLine) continue;
       const line = sanitizeForFont(rawLine, font);
-      const baselineY = topY - ascentOffset - i * lineHeight;
+      const baselineFromTop = displayTopY + ascentOffset + i * lineHeight;
+      const origin = displayPointToPdf(
+        cropBox,
+        rotation,
+        displayX,
+        baselineFromTop,
+      );
 
       page.drawText(line, {
-        x,
-        y: baselineY,
+        x: origin.x,
+        y: origin.y,
         size: fontSize,
         font,
         color: pdfColor,
+        ...(rotation !== 0 ? { rotate: degrees(rotation) } : {}),
       });
 
       if (box.underline) {
         const lineWidth = font.widthOfTextAtSize(line, fontSize);
-        const underlineY = baselineY - fontSize * UNDERLINE_OFFSET_RATIO;
+        const underlineFromTop =
+          baselineFromTop + fontSize * UNDERLINE_OFFSET_RATIO;
+        const start = displayPointToPdf(
+          cropBox,
+          rotation,
+          displayX,
+          underlineFromTop,
+        );
+        const end = displayPointToPdf(
+          cropBox,
+          rotation,
+          displayX + lineWidth,
+          underlineFromTop,
+        );
         page.drawLine({
-          start: { x, y: underlineY },
-          end: { x: x + lineWidth, y: underlineY },
+          start,
+          end,
           thickness: Math.max(
             MIN_UNDERLINE_THICKNESS,
             fontSize * UNDERLINE_THICKNESS_RATIO,

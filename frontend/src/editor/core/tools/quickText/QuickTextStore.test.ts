@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { QuickTextStore } from "@editor/tools/quickText/QuickTextStore";
 import {
   DEFAULT_FONT_SIZE_PT,
@@ -8,6 +8,10 @@ import {
 } from "@editor/tools/quickText/types";
 
 describe("QuickTextStore", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("adds, edits, formats, and deletes boxes with undo/redo", () => {
     const store = new QuickTextStore();
     const box = store.addBox(0, 0.25, 0.4);
@@ -58,6 +62,60 @@ describe("QuickTextStore", () => {
 
     store.redo();
     expect(store.getSnapshot().boxes).toHaveLength(0);
+  });
+
+  it("records coalesced undo snapshots for text edits without wiping formatting or the whole box", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    const store = new QuickTextStore();
+    const box = store.addBox(0, 0.2, 0.2);
+
+    store.updateText(box.id, "Hola");
+    vi.advanceTimersByTime(1000);
+    store.updateText(box.id, "Hola mundo");
+
+    // First undo reverts only the second burst, keeping "Hola".
+    store.undo();
+    expect(store.getSnapshot().boxes).toHaveLength(1);
+    expect(store.getSnapshot().boxes[0].text).toBe("Hola");
+
+    // Typing after a formatting change creates a separate undo step from the formatting.
+    store.toggleBold(box.id);
+    store.updateText(box.id, "Hola!");
+    store.undo();
+    expect(store.getSnapshot().boxes[0].text).toBe("Hola");
+    expect(store.getSnapshot().boxes[0].bold).toBe(true);
+  });
+
+  it("drops redundant undo snapshots when empty boxes are pruned and keeps cleared boxes undoable", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    const store = new QuickTextStore();
+    const first = store.addBox(0, 0.1, 0.1);
+    store.updateText(first.id, "Persist");
+
+    // Abandon two empty boxes in a row.
+    store.addBox(0, 0.3, 0.3);
+    store.addBox(0, 0.5, 0.5);
+    store.selectBox(null);
+    expect(store.getSnapshot().boxes).toHaveLength(1);
+
+    // One undo removes "Persist" immediately instead of hitting stale no-op snapshots.
+    store.undo();
+    expect(store.getSnapshot().boxes).toHaveLength(0);
+    store.redo();
+    expect(store.getSnapshot().boxes[0].text).toBe("Persist");
+
+    // Clearing a non-empty box and deselecting still allows Undo to restore it.
+    store.selectBox(first.id);
+    vi.advanceTimersByTime(1000);
+    store.updateText(first.id, "");
+    store.selectBox(null);
+    expect(store.getSnapshot().boxes).toHaveLength(0);
+
+    store.undo();
+    expect(store.getSnapshot().boxes).toHaveLength(1);
+    expect(store.getSnapshot().boxes[0].text).toBe("Persist");
   });
 
   it("clamps font size between min and max bounds", () => {

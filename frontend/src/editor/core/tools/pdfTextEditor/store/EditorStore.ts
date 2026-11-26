@@ -28,6 +28,7 @@ import type {
 import { unionRect } from "@editor/tools/pdfTextEditor/model/affine";
 import type { FileId } from "@editor/types/file";
 import { AdoptTableCommand } from "@editor/tools/pdfTextEditor/commands/AdoptTableCommand";
+import { InsertTextCommand } from "@editor/tools/pdfTextEditor/commands/InsertTextCommand";
 import {
   adoptedTableId,
   adoptedTableModel,
@@ -454,6 +455,24 @@ export class EditorStore {
     model.editing = false;
     page.bumpRevision();
     this.resnapshot();
+  }
+
+  /** Drop an untouched empty inserted box without leaving it in undo/redo history. */
+  discardEmptyInsert(pageIndex: number, runId: string): boolean {
+    if (!this.doc) return false;
+    const run = this.doc.page(pageIndex).findRun(runId);
+    if (!run || run.text.length > 0 || run.pdfiumObjPtr !== 0) return false;
+    const top = this.history.peekUndo();
+    if (!(top instanceof InsertTextCommand) || top.insertedRunId !== runId) {
+      return false;
+    }
+    if (!this.history.discardTop(this.doc)) return false;
+    if (this.selection.value.runIds.includes(runId)) {
+      this.selection.clear();
+    }
+    this.resnapshot();
+    this.patch({ dirty: this.isDirty() });
+    return true;
   }
 
   /** Record a command the caller already applied as one undo step, re-snapshot, and notify. */

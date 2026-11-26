@@ -387,6 +387,8 @@ interface TextRunOverlayProps {
   onMeasure?: () => TextRunSnapshot | null;
   /** Fires when the user drags the right edge to a new width, in PDF points. */
   onResize?: (widthPt: number) => void;
+  /** Fires when an untouched newly inserted empty box loses focus or is dismissed. */
+  onDiscardEmpty?: () => void;
   /** Fires while the box has focus, as the characters selected inside it change. */
   onTextRangeChange?: (range: TextRange | null) => void;
   /** The characters selected inside the box, highlighted while it has no focus. */
@@ -539,6 +541,7 @@ export function TextRunOverlay({
   onWrap,
   onMeasure,
   onResize,
+  onDiscardEmpty,
   onTextRangeChange,
   textRange,
   gripLayer,
@@ -620,7 +623,12 @@ export function TextRunOverlay({
   // unmounted resize can never commit a width on a later pointerup.
   const endResizeRef = useRef<(() => void) | null>(null);
   useEffect(() => () => endResizeRef.current?.(), []);
-  const originalBoundsWidthRef = useRef<number>(run.bounds.width);
+  // Newly created runs start empty or with short placeholder bounds; avoid locking Wrap mode to a tiny width.
+  const originalBoundsWidthRef = useRef<number>(
+    run.id.includes("-new-") && run.wrapWidthPt == null
+      ? Math.max(run.bounds.width, 240)
+      : run.bounds.width,
+  );
   // The widest line when focus arrived: Grow wraps only what is typed past the page edge, never a line the document already set wider.
   const focusWidestRef = useRef(0);
   // Set when a Grow wrap was refused for want of room below: the box then grows past the page edge for the rest of this edit rather than draw over what is there.
@@ -1350,12 +1358,18 @@ export function TextRunOverlay({
         )
       : null;
 
+  const isEmpty = run.text.length === 0 && !run.locked;
+  const placeholder = isEmpty
+    ? t("pdfTextEditor.run.placeholder", "Type text...")
+    : undefined;
+
   const box = (
     <div
       ref={ref}
       data-testid={`pdf-editor-run-${run.id}`}
       data-run-id={run.id}
-      className={`pdf-editor-run${pristine ? " is-pristine" : ""}`}
+      data-placeholder={placeholder}
+      className={`pdf-editor-run${pristine ? " is-pristine" : ""}${isEmpty ? " is-empty" : ""}`}
       contentEditable={!run.locked && !run.textReadOnly}
       suppressContentEditableWarning
       spellCheck={spellcheck.enabled && focused}
@@ -1375,6 +1389,27 @@ export function TextRunOverlay({
             : undefined
       }
       onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          e.stopPropagation();
+          e.currentTarget.blur();
+          return;
+        }
+        if (
+          e.key === "Backspace" &&
+          !e.ctrlKey &&
+          !e.metaKey &&
+          !e.altKey &&
+          run.text.length === 0 &&
+          readOverlayText(e.currentTarget).length === 0 &&
+          onDiscardEmpty
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.currentTarget.blur();
+          onDiscardEmpty();
+          return;
+        }
         // A caret parked on the container (a click past the text lands there)
         // makes Firefox insert the keystroke as a sibling of the line blocks,
         // which reads back as a line the user never typed. Seat it in the
@@ -1466,9 +1501,13 @@ export function TextRunOverlay({
             sel.removeAllRanges();
           }
         }
-        if (!onWrap || !(wantWrap || growWraps)) return;
         const el = e.currentTarget;
         const domText = readOverlayText(el);
+        if (domText.length === 0 && run.text.length === 0) {
+          onDiscardEmpty?.();
+          return;
+        }
+        if (!onWrap || !(wantWrap || growWraps)) return;
         if (domText === focusTextRef.current) return; // not edited
         const widest = measureMaxLineWidth(domText, font);
         if (!wantWrap) {
